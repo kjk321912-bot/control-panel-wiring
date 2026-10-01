@@ -1,5 +1,5 @@
 // 앱을 고친 뒤에는 VERSION을 올려야 태블릿에 새 버전이 내려갑니다.
-const VERSION='v3';
+const VERSION='v4';
 const CORE=[
   './','index.html','manifest.webmanifest',
   'icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','icons/apple-touch-icon.png',
