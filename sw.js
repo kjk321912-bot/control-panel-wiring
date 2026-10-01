@@ -1,5 +1,5 @@
 // 앱을 고친 뒤에는 VERSION을 올려야 태블릿에 새 버전이 내려갑니다.
-const VERSION='v2';
+const VERSION='v3';
 const CORE=[
   './','index.html','manifest.webmanifest',
   'icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','icons/apple-touch-icon.png',
@@ -27,7 +27,7 @@ self.addEventListener('fetch',e=>{
   if(url.origin!==location.origin)return;
   // 앱 화면: 인터넷이 되면 새 버전을 받고, 안 되면 캐시로
   if(req.mode==='navigate'){
-    e.respondWith(fetch(req).then(res=>{const cp=res.clone();caches.open(APP).then(c=>c.put('index.html',cp));return res;}).catch(()=>caches.match('index.html')));
+    e.respondWith(fetch(req,{cache:'no-store'}).then(res=>{const cp=res.clone();caches.open(APP).then(c=>c.put('index.html',cp));return res;}).catch(()=>caches.match('index.html')));
     return;
   }
   e.respondWith(caches.match(req,{ignoreSearch:true}).then(hit=>hit||fetch(req).then(res=>{if(res.ok){const cp=res.clone();caches.open(APP).then(c=>c.put(req,cp));}return res;})));

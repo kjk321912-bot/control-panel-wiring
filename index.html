@@ -216,7 +216,7 @@ svg text{pointer-events:none}
   <header class="top">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#2a2d30"/><circle cx="9" cy="9" r="3" fill="#d6d9db"/><circle cx="21" cy="21" r="3" fill="#d6d9db"/><path d="M9 9V15H21V21" stroke="#e8c21c" stroke-width="2.4" fill="none"/></svg>
-      <div><b>제어판 배선</b><small>전기기능사 공개문제</small></div>
+      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v3</small></div>
     </div>
     <select class="prob" id="prob" aria-label="공개문제 선택"></select>
     <div class="seg" id="modes">
@@ -956,7 +956,7 @@ addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;});
 addEventListener('appinstalled',()=>{installEvt=null;toast('앱이 설치되었습니다');});
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
   const hadSW=!!navigator.serviceWorker.controller;
-  addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').then(reg=>{
+  addEventListener('load',()=>{navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{
     reg.addEventListener('updatefound',()=>{const w=reg.installing;w&&w.addEventListener('statechange',()=>{if(w.state==='activated'&&hadSW)toast('새 버전이 준비되었습니다. 앱을 다시 열면 적용됩니다.');});});
   }).catch(()=>{});});
 }
