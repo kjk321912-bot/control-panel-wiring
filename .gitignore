@@ -1,0 +1,7 @@
+# 개인 파일
+스크린샷*.png
+*.tmp
+
+# 도구 실행 부산물
+__pycache__/
+node_modules/
