@@ -219,7 +219,7 @@ svg text{pointer-events:none}
   <header class="top">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#2a2d30"/><circle cx="9" cy="9" r="3" fill="#d6d9db"/><circle cx="21" cy="21" r="3" fill="#d6d9db"/><path d="M9 9V15H21V21" stroke="#e8c21c" stroke-width="2.4" fill="none"/></svg>
-      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v4</small></div>
+      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v5</small></div>
     </div>
     <select class="prob" id="prob" aria-label="공개문제 선택"></select>
     <div class="seg" id="modes">
@@ -514,7 +514,8 @@ function buildGrid(skipWire){
       for(let k=0;k<=n;k++){const id=at(x,y);if(id>=0&&occ[id]<4)occ[id]++;x+=sx;y+=sy;}}}
   return {gx0,gy0,W,H,blk,occ,at,isBlk(cx,cy){const i=at(cx,cy);return i<0||blk[i]===1;}};
 }
-function astar(g,s,t){
+function astar(g,s,t,opt){
+  const bend=opt&&opt.bend||6,extra=opt&&opt.extra;
   const si=g.at(s.x,s.y),ti=g.at(t.x,t.y);if(si<0||ti<0)return null;
   const N=g.W*g.H,best=new Float32Array(N*5).fill(Infinity),par=new Int32Array(N*5).fill(-1),DX=[1,-1,0,0],DY=[0,0,1,-1],heap=[];
   const push=(f,n)=>{heap.push([f,n]);let i=heap.length-1;while(i){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;[heap[p],heap[i]]=[heap[i],heap[p]];i=p;}};
@@ -526,7 +527,7 @@ function astar(g,s,t){
     if(ci===ti){end=n;break;}
     const cx=ci%g.W+g.gx0,cy=((ci/g.W)|0)+g.gy0;
     for(let d=0;d<4;d++){const ni=g.at(cx+DX[d],cy+DY[d]);if(ni<0||(g.blk[ni]&&ni!==ti))continue;
-      const c=gc+1+(dir!==4&&dir!==d?6:0)+g.occ[ni]*1.5,nn=ni*5+d;if(c<best[nn]){best[nn]=c;par[nn]=n;push(c+hf(ni),nn);}}
+      const c=gc+1+(dir!==4&&dir!==d?bend:0)+(extra?extra[ni]:g.occ[ni]*1.5),nn=ni*5+d;if(c<best[nn]){best[nn]=c;par[nn]=n;push(c+hf(ni),nn);}}
   }
   if(end<0)return null;
   const cells=[];for(let n=end;n>=0;n=par[n]){const ci=(n/5)|0;cells.push({x:ci%g.W+g.gx0,y:((ci/g.W)|0)+g.gy0});}
@@ -535,8 +536,15 @@ function astar(g,s,t){
 function simplify(pts){const o=[];for(const p of pts){const n=o.length;if(n&&o[n-1].x===p.x&&o[n-1].y===p.y)continue;
   if(n>=2){const a=o[n-2],b=o[n-1];if((a.x===b.x&&b.x===p.x)||(a.y===b.y&&b.y===p.y)){o[n-1]=p;continue;}}o.push(p);}return o;}
 const cellPts=cs=>cs.map(c=>({x:c.x*G,y:c.y*G}));
+/* 단자 바로 앞의 작은 꺾임을 없애 단자에서 곧게 뻗어 나가게 함 */
+function tidy(pts){
+  let p=simplify(pts);
+  const fix=a=>{if(a.length>=3&&a[0].y===a[1].y&&Math.abs(a[1].x-a[0].x)<G&&a[1].x===a[2].x){a[1].x=a[2].x=a[0].x;}return a;};
+  p=simplify(fix(p));p=simplify(fix(p.reverse()).reverse());
+  return p;
+}
 function routeWire(a,b,g){const A=exitOf(a),B=exitOf(b),cells=astar(g,{x:A.cx,y:A.cy},{x:B.cx,y:B.cy});
-  return cells?simplify([{x:A.x,y:A.y},...cellPts(cells),{x:B.x,y:B.y}]):null;}
+  return cells?tidy([{x:A.x,y:A.y},...cellPts(cells),{x:B.x,y:B.y}]):null;}
 function crossesBody(w){
   if(!w.pts)return true;
   const rs=S.parts.map(bodyRect);
@@ -770,17 +778,30 @@ function walk(gs,tx,ty){
     if(!moved){gs.blocked=true;break;}
   }
 }
+/* 손으로 그린 길을 따라가되 꺾임이 가장 적은 직각 경로로 정리 */
+function straighten(g,cells,end){
+  const N=g.W*g.H,R=4,dist=new Uint8Array(N).fill(255),q=[];
+  for(const c of [...cells,end]){const i=g.at(c.x,c.y);if(i>=0&&dist[i]){dist[i]=0;q.push(i);}}
+  for(let h=0;h<q.length;h++){const i=q[h],d=dist[i];if(d>=R)continue;const x=i%g.W,y=(i/g.W)|0;
+    for(const [nx,ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]){if(nx<0||ny<0||nx>=g.W||ny>=g.H)continue;const j=ny*g.W+nx;if(g.blk[j]||dist[j]<=d+1)continue;dist[j]=d+1;q.push(j);}}
+  const extra=new Float32Array(N);for(let i=0;i<N;i++){const d=dist[i];extra[i]=d<=1?0:d<=R?(d-1)*2:25;}
+  return astar(g,cells[0],end,{bend:20,extra});
+}
 function drawPreview(gs,bp){
-  const P=pinPos(gs.from),pts=simplify([P,{x:gs.A.x,y:gs.A.y},...cellPts(gs.cells)]),d='M'+pts.map(p=>`${p.x} ${p.y}`).join('L'),last=pts[pts.length-1];
-  const c=WC[wireColor]||WC.y;$('#drawo').setAttribute('d',d);const dp=$('#drawp');dp.setAttribute('d',d);dp.style.stroke=c.hex;
-  $('#rubber').setAttribute('d',hovPin?'':`M${last.x} ${last.y}L${bp.x} ${bp.y}`);
+  const P=pinPos(gs.from),raw=simplify([P,{x:gs.A.x,y:gs.A.y},...cellPts(gs.cells)]),last=raw[raw.length-1];
+  $('#rubber').setAttribute('d','M'+raw.map(p=>`${p.x} ${p.y}`).join('L')+(hovPin?'':`L${bp.x} ${bp.y}`));
+  const now=performance.now(),key=gs.cells.length+':'+gs.cells[gs.cells.length-1].x+','+gs.cells[gs.cells.length-1].y;
+  if(key!==gs.pkey&&now-(gs.pt||0)>70){gs.pkey=key;gs.pt=now;
+    const st=gs.cells.length>1?straighten(gs.g,gs.cells,gs.cells[gs.cells.length-1]):null;
+    const pts=[P,...tidy([{x:gs.A.x,y:gs.A.y},...cellPts(st||gs.cells)])],d='M'+pts.map(p=>`${p.x} ${p.y}`).join('L');
+    const c=WC[wireColor]||WC.y;$('#drawo').setAttribute('d',d);const dp=$('#drawp');dp.setAttribute('d',d);dp.style.stroke=c.hex;}
   const bd=$('#blockdot');if(gs.blocked&&!hovPin){bd.setAttribute('cx',bp.x);bd.setAttribute('cy',bp.y);bd.setAttribute('r','11');}else bd.setAttribute('r','0');
 }
 function finishDraw(gs,target){
   if(samePin(target,gs.from))return;
-  const B=exitOf(target),last=gs.cells[gs.cells.length-1],tail=astar(gs.g,last,{x:B.cx,y:B.cy});
-  if(!tail){toast('목표 단자까지 기구를 피해 갈 길이 없습니다. 기구 바깥쪽으로 그려 주세요.','warn');return;}
-  addWire(gs.from,target,simplify([{x:gs.A.x,y:gs.A.y},...cellPts(gs.cells),...cellPts(tail.slice(1)),{x:B.x,y:B.y}]));
+  const B=exitOf(target),path=straighten(gs.g,gs.cells,{x:B.cx,y:B.cy});
+  if(!path){toast('목표 단자까지 기구를 피해 갈 길이 없습니다. 기구 바깥쪽으로 그려 주세요.','warn');return;}
+  addWire(gs.from,target,tidy([{x:gs.A.x,y:gs.A.y},...cellPts(path),{x:B.x,y:B.y}]));
 }
 svg.addEventListener('pointerup',onUp);svg.addEventListener('pointercancel',onUp);
 svg.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,view.s*Math.exp(-e.deltaY*.0015));},{passive:false});
