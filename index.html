@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>제어판 배선 시뮬레이터</title>
+<meta name="description" content="전기기능사 실기 공개문제 1~18번 제어판 배선 연습">
+<meta name="theme-color" content="#1d2221">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="제어판 배선">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 상단 도구줄 / 가운데 제어함(합판 400×420)과 외부 기구 · 떠 있는 도면 창 · 우측 정보 패널 (태블릿 가로 기준) */
+:root{
+  --bg:#e4e8e4; --panel:#f5f7f4; --raise:#ffffff; --line:#c6ccc6; --fg:#1b2220; --muted:#5b6661;
+  --accent:#1f5aa6; --accent-fg:#ffffff; --accent-soft:rgba(31,90,166,.12);
+  --danger:#c22d26; --ok:#2c7a47; --warn:#a86400; --live:#ffab1a;
+  --stage:#cdd3cd; --wall:#c3cac4; --board:#dcc49a; --board-edge:#a98a57; --board-grid:rgba(110,80,30,.14); --board-grid5:rgba(110,80,30,.26); --board-ink:#3d301b;
+  --f-ui:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#151918; --panel:#1d2221; --raise:#252b2a; --line:#343c3a; --fg:#e2e8e5; --muted:#98a39e;
+  --accent:#78a6ea; --accent-fg:#0b1628; --accent-soft:rgba(120,166,234,.16);
+  --danger:#ff6b60; --ok:#62c487; --warn:#f0a640; --live:#ffb733;
+  --stage:#101312; --wall:#181c1b; --board:#c4ab80; --board-edge:#8a6e42; --board-grid:rgba(70,50,20,.2); --board-grid5:rgba(70,50,20,.32); --board-ink:#2e2412;
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#151918; --panel:#1d2221; --raise:#252b2a; --line:#343c3a; --fg:#e2e8e5; --muted:#98a39e;
+  --accent:#78a6ea; --accent-fg:#0b1628; --accent-soft:rgba(120,166,234,.16);
+  --danger:#ff6b60; --ok:#62c487; --warn:#f0a640; --live:#ffb733;
+  --stage:#101312; --wall:#181c1b; --board:#c4ab80; --board-edge:#8a6e42; --board-grid:rgba(70,50,20,.2); --board-grid5:rgba(70,50,20,.32); --board-ink:#2e2412;
+  color-scheme:dark;}
+
+html,body{height:100%;overscroll-behavior:none}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 var(--f-ui);overflow:hidden;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+button{touch-action:manipulation;cursor:pointer}
+input,textarea{-webkit-user-select:text;user-select:text}
+
+#app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 312px;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"top top" "stage side"}
+#app.noside{grid-template-columns:minmax(0,1fr) 0}
+#app.noside #side{display:none}
+
+.top{grid-area:top;display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;padding:8px 16px;
+  padding-top:calc(8px + env(safe-area-inset-top,0px));background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px}
+.brand b{font-weight:700;font-size:15px;letter-spacing:-.01em;white-space:nowrap}
+.brand small{display:block;font-size:11px;color:var(--muted);font-weight:500}
+.prob{min-height:40px;border:1px solid var(--line);border-radius:9px;background:var(--raise);padding:0 10px;font-weight:600;font-size:15px}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;min-height:38px;padding:0 14px;border-radius:7px;font-weight:600;color:var(--muted);white-space:nowrap}
+.seg button.on{background:var(--accent);color:var(--accent-fg)}
+.chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.chips .lbl{font-size:12px;color:var(--muted);margin-right:2px}
+.chip{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);padding:0;display:grid;place-items:center;font-size:10px;font-weight:700}
+.chip.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.spacer{flex:1}
+.btn{min-height:38px;padding:0 13px;border-radius:8px;border:1px solid var(--line);background:var(--raise);font-weight:500;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn:disabled{opacity:.4}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+.btn.danger{color:var(--danger)}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:32px;padding:0 9px;font-size:12.5px}
+.btn:focus-visible,.seg button:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn svg{width:18px;height:18px}
+.power{min-width:112px;font-weight:700}
+.power.on{background:var(--danger);border-color:var(--danger);color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:none}
+.dot.show{display:inline-block}
+
+#stage{grid-area:stage;position:relative;overflow:hidden;background:var(--stage)}
+#board{width:100%;height:100%;display:block;touch-action:none}
+.hint{position:absolute;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));max-width:min(520px,calc(100% - 210px));background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--muted);pointer-events:none}
+.hint b{color:var(--fg)}
+.zoom{position:absolute;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:6px}
+.zoom .btn{min-width:42px;min-height:42px;padding:0 10px}
+.fault{position:absolute;left:50%;top:12px;transform:translateX(-50%);width:min(560px,calc(100% - 32px));background:var(--danger);color:#fff;border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:6}
+.fault p{margin:0;flex:1;font-weight:500}
+.fault .btn{background:#fff;color:#8f1c16;border:0}
+
+/* 도면 창 */
+.doc{position:absolute;right:12px;top:12px;width:min(640px,58%);height:min(400px,52%);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.22);display:flex;flex-direction:column;z-index:5;overflow:hidden}
+.doc.big{left:12px!important;top:12px!important;right:12px;bottom:12px;width:auto;height:auto}
+.doc.min{height:auto}
+.doc.min .doc-b{display:none}
+.doc-h{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);cursor:move;touch-action:none;flex-wrap:wrap}
+.doc-h .seg button{min-height:32px;padding:0 10px;font-size:12.5px}
+.doc-b{flex:1;overflow:auto;background:#fff;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
+.doc-b img{display:block;width:100%;height:auto;max-width:none}
+.doc-ops{padding:12px 16px 20px;color:#1b2220;font-size:14px;line-height:1.6;max-width:70ch;-webkit-user-select:text;user-select:text}
+.doc-ops p{margin:0 0 6px}
+.doc-ops .h{font-weight:700;margin-top:12px}
+.doc-ops .i{padding-left:1.6em;text-indent:-1.6em}
+.doc-ops .note{color:#5b6661;font-size:12.5px;margin-top:12px}
+
+#side{grid-area:side;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:14px 16px 32px;-webkit-user-select:text;user-select:text}
+#side h2{margin:2px 0 0;font-size:22px;letter-spacing:-.01em;text-wrap:balance}
+#side h3{margin:18px 0 8px;font-size:13px;font-weight:600}
+.eyebrow{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.fld{display:flex;flex-direction:column;gap:4px;margin-top:12px;font-size:12px;color:var(--muted)}
+.fld input,.fld select{min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--raise);padding:0 10px;font-size:15px;color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.row .btn{flex:1}
+table.kv{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+table.kv td,table.kv th{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left;vertical-align:top}
+table.kv th{font-weight:600;color:var(--muted);font-size:11px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.bad{color:var(--danger);font-weight:600}
+.good{color:var(--ok);font-weight:600}
+.card{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.stat div{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;color:var(--muted)}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);margin:2px 4px 2px 0}
+.pill.off{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.pill.red{background:rgba(220,50,40,.14);color:var(--danger)}
+details{margin-top:12px}
+summary{cursor:pointer;font-weight:600;font-size:13px;min-height:32px;display:flex;align-items:center}
+ul.list{margin:6px 0 0;padding-left:18px;font-size:12.5px}
+ul.list li{margin:3px 0}
+.wsw{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+
+.modal{position:fixed;inset:0;background:rgba(10,14,13,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:min(620px,100%);max-height:calc(100% - 32px);overflow:auto;padding:18px 18px 20px;-webkit-user-select:text;user-select:text}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet h4{margin:18px 0 6px;font-size:13px}
+.sheet textarea{width:100%;box-sizing:border-box;min-height:84px;border:1px solid var(--line);border-radius:8px;background:var(--raise);padding:8px;font:12px var(--f-mono);resize:vertical}
+.sheet input,.sheet select{min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--raise);padding:0 10px}
+.sheet .row input{flex:2;min-width:0}
+.slots{list-style:none;margin:8px 0 0;padding:0}
+.slots li{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:6px 0}
+.slots li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pmtab select{min-height:36px;width:100%}
+.pmtab td{padding:4px 3px}
+.close{float:right}
+.addgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:12px}
+.pitem{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px 6px;border-radius:9px;border:1px solid var(--line);background:var(--raise);font-size:11.5px;font-weight:500;line-height:1.2;text-align:center}
+.pitem svg{width:100%;height:46px}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:500;transition:.2s;pointer-events:none;z-index:30;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.warn{background:var(--warn);color:#fff}
+
+/* svg */
+.wallrect{fill:var(--wall)}
+.panelrect{fill:var(--board);stroke:var(--board-edge);stroke-width:4}
+.gridl{stroke:var(--board-grid);stroke-width:1;fill:none}
+.gridl5{stroke:var(--board-grid5);stroke-width:1;fill:none}
+.boardcap{font:600 15px var(--f-ui);fill:var(--muted)}
+.zonecap{font:600 13px var(--f-ui);fill:var(--muted)}
+svg text{pointer-events:none}
+.tl{font:600 12.5px var(--f-ui);fill:#1c2124}
+.tlw{font:600 12.5px var(--f-ui);fill:#fff}
+.tld{font:600 10.5px var(--f-ui);fill:#1c2124}
+.ts{font:500 8.5px var(--f-mono);fill:#596065}
+.tsw{font:500 9px var(--f-mono);fill:#dfe3e5;text-anchor:middle}
+.tsl{font:500 8.5px var(--f-mono);fill:#e2e6e8}
+.tn{font:600 9px var(--f-mono);fill:#e8ebed;text-anchor:middle}
+.tnb{font:600 10px var(--f-mono);fill:#e8ebed;text-anchor:middle}
+.tnd{font:600 9.5px var(--f-mono);fill:#363b3f;text-anchor:middle}
+.tc{font:700 13px var(--f-ui);fill:var(--board-ink);text-anchor:middle}
+.tcx{font:700 13px var(--f-ui);fill:var(--fg);text-anchor:middle}
+.tstat{font:700 11px var(--f-ui);text-anchor:middle}
+.selbox{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-dasharray:6 4}
+.pin .ph{fill:transparent}
+.pin .ps{fill:#d6d9db;stroke:#6b7276;stroke-width:1.1}
+.pin .pslot{stroke:#6b7276;stroke-width:1.4}
+.mode-wire .pin .ps{stroke:#2b5fa8;stroke-width:1.6}
+.pin.hov .ph,.pin.pend .ph{fill:var(--accent);opacity:.35}
+.pin.pend .ps{fill:#ffd23f}
+.pin.over .ph{fill:#e0281e;opacity:.4}
+.wire .wh{fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke}
+.wire .wo{fill:none;stroke:rgba(0,0,0,.45);stroke-width:5.2;stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
+.wire .wc{fill:none;stroke-width:3.2;stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
+.wire.sel .wo{stroke:var(--accent);stroke-width:9;opacity:.75}
+.sim .wire.live .wo{stroke:var(--live);stroke-width:8;opacity:.7}
+.wire.short .wo{stroke:#ff2416;stroke-width:10;opacity:.9;animation:blink .5s steps(2) infinite}
+.handle circle{fill:var(--accent);stroke:#fff;stroke-width:2}
+.rubber{stroke:var(--accent);stroke-width:2.5;stroke-dasharray:6 5;fill:none;pointer-events:none}
+.rot{transform-box:fill-box;transform-origin:center}
+.rot.cw{animation:spin .5s linear infinite}
+.rot.ccw{animation:spin .5s linear infinite reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{50%{opacity:.25}}
+@media (prefers-reduced-motion: reduce){.rot.cw,.rot.ccw{animation-duration:3s}.wire.short .wo{animation:none}.toast{transition:none}}
+
+@media (max-width: 900px){
+  #app,#app.noside{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);grid-template-areas:"top" "stage"}
+  #side,#app.noside #side{display:block;position:fixed;left:0;right:0;bottom:0;max-height:58%;border-left:0;border-top:1px solid var(--line);border-radius:16px 16px 0 0;
+    box-shadow:0 -10px 30px rgba(0,0,0,.2);z-index:10;transform:translateY(105%);transition:transform .2s;padding-bottom:calc(32px + env(safe-area-inset-bottom,0px))}
+  #app.sideopen #side{transform:none}
+  .doc{width:calc(100% - 24px);height:42%}
+  .hint{display:none}
+  .brand small{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="app" class="mode-place">
+  <header class="top">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#2a2d30"/><circle cx="9" cy="9" r="3" fill="#d6d9db"/><circle cx="21" cy="21" r="3" fill="#d6d9db"/><path d="M9 9V15H21V21" stroke="#e8c21c" stroke-width="2.4" fill="none"/></svg>
+      <div><b>제어판 배선</b><small>전기기능사 공개문제</small></div>
+    </div>
+    <select class="prob" id="prob" aria-label="공개문제 선택"></select>
+    <div class="seg" id="modes">
+      <button data-mode="place" class="on">배치</button>
+      <button data-mode="wire">배선</button>
+      <button data-mode="sim">동작 시험</button>
+    </div>
+    <div class="chips" id="wirebar" hidden></div>
+    <div class="chips" id="simbar" hidden>
+      <button class="btn power" id="btn-power">전원 OFF</button>
+      <button class="btn" id="btn-reset">초기화</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="btn-undo" title="되돌리기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>되돌리기</button>
+    <button class="btn" id="btn-redo" title="다시 실행"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/></svg></button>
+    <button class="btn" id="btn-doc">도면</button>
+    <button class="btn" id="btn-file">파일</button>
+    <button class="btn" id="btn-side">정보 <span class="dot" id="seldot"></span></button>
+  </header>
+
+  <main id="stage">
+    <svg id="board" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="g25" width="25" height="25" patternUnits="userSpaceOnUse"><path d="M25 0H0V25" class="gridl"/></pattern>
+        <pattern id="g125" width="125" height="125" patternUnits="userSpaceOnUse"><path d="M125 0H0V125" class="gridl5"/></pattern>
+      </defs>
+      <g id="vp">
+        <rect class="wallrect" x="-560" y="-330" width="2120" height="1760" rx="24"/>
+        <text x="-540" y="-300" class="zonecap">외부 기구 (컨트롤 박스 · 단자대)</text>
+        <text x="0" y="-14" class="boardcap">제어함 400 × 420 mm</text>
+        <rect class="panelrect" x="0" y="0" width="1000" height="1050" rx="4"/>
+        <rect x="0" y="0" width="1000" height="1050" fill="url(#g25)"/>
+        <rect x="0" y="0" width="1000" height="1050" fill="url(#g125)"/>
+        <g id="Lparts"></g><g id="Lwires"></g><g id="Lpins"></g><g id="Lover"></g>
+      </g>
+    </svg>
+    <section class="doc" id="doc">
+      <div class="doc-h" id="doc-h">
+        <div class="seg" id="doc-tabs">
+          <button data-tab="c" class="on">회로도</button><button data-tab="o">동작 사항</button><button data-tab="p">핀 결선도</button><button data-tab="b">배관도</button>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn sm" id="doc-zo" aria-label="도면 축소">−</button>
+        <button class="btn sm" id="doc-zi" aria-label="도면 확대">+</button>
+        <button class="btn sm" id="doc-big">크게</button>
+        <button class="btn sm" id="doc-min">접기</button>
+      </div>
+      <div class="doc-b" id="doc-b"></div>
+    </section>
+    <div class="fault" id="fault" hidden><p id="fault-msg"></p><button class="btn" id="fault-ok">확인</button></div>
+    <div class="hint" id="hint"></div>
+    <div class="zoom">
+      <button class="btn" id="z-out" aria-label="축소">−</button>
+      <button class="btn" id="z-in" aria-label="확대">+</button>
+      <button class="btn" id="z-fit">맞춤</button>
+    </div>
+  </main>
+
+  <aside id="side"><div id="side-body"></div></aside>
+</div>
+<div class="modal" id="modal" hidden><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const OPS={"1": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 자동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 A(자동) 위치에 놓으면 플로트레스 스위치 FLS에 전원이 공급되고, 플로트레스 스위치 FLS의 수위 감지가 동작되면, 릴레이 X, 전자접촉기 MC1가 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(2) 전동기가 운전하는 중 플로트레스 스위치 FLS의 수위 감지가 해제되거나 셀렉터 스위치 SS를 M(수동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "다) 수동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 M(수동) 위치에 놓은 상태에서, 푸시버튼 스위치 PB1을 누르면, 타이머 T, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(2) 타이머 T의 설정시간 t초 후, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고 램프 GL이 점등된다.", "(3) 전동기가 운전하는 중 푸시버튼 스위치 PB0를 누르거나 셀렉터 스위치 SS를 A(자동) 위치에 놓으면, 제어회로 및 전동기 동작은 모두 정지된다.", "라) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 플리커릴레이 FR이 여자되고, 부저 BZ가 동작된다.", "(2) 플리커릴레이 FR의 설정시간 간격으로 부저 BZ와 램프 YL이 교대로 동작된다.", "(3) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "2": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 자동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 A(자동) 위치에 놓으면 플로트레스 스위치 FLS에 전원이 공급되고, 플로트레스 스위치 FLS의 수위 감지가 동작되면, 릴레이 X, 타이머 T가 여자된다.", "(2) 타이머 T의 설정시간 t초 후에, 플리커릴레이 FR, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(3) 플리커릴레이 FR의 설정시간 간격으로 전자접촉기 MC1과 MC2가 교대로 여자되어, 전동기 M1과 M2가 교대로 회전하고 램프 RL과 GL이 교대로 점등된다.", "(4) 전동기가 운전하는 중 플로트레스 스위치 FLS의 수위 감지가 해제되거나 셀렉터 스위치 SS를 M(수동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "다) 수동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 M(수동) 위치에 놓은 상태에서, 푸시버튼 스위치 PB1을 누르면, 릴레이 X, 타이머 T가 여자된다.", "(2) 타이머 T의 설정시간 t초 후, 플리커릴레이 FR, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(3) 플리커릴레이 FR의 설정시간 간격으로 전자접촉기 MC1과 MC2가 교대로 여자되어, 전동기 M1과 M2가 교대로 회전하고 램프 RL과 GL이 교대로 점등된다.", "(4) 전동기가 운전하는 중 푸시버튼 스위치 PB0를 누르거나 셀렉터 스위치 SS를 A(자동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "라) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 부저 BZ가 동작되고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "3": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 자동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 A(자동) 위치에 놓으면 플로트레스 스위치 FLS에 전원이 공급되고, 플로트레스 스위치 FLS의 수위 감지가 동작되면, 플리커릴레이 FR, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(2) 플리커릴레이 FR의 설정시간 간격으로 전자접촉기 MC1과 MC2가 교대로 여자되어, 전동기 M1과 M2가 교대로 회전하고 램프 RL과 GL이 교대로 점등된다.", "(3) 전동기가 운전하는 중 플로트레스 스위치 FLS의 수위 감지가 해제되거나 셀렉터 스위치 SS를 M(수동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "다) 수동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 M(수동) 위치에 놓은 상태에서, 푸시버튼 스위치 PB1을 누르면, 타이머 T가 여자된다.", "(2) 타이머 T의 설정시간 t초 후, 릴레이 X, 플리커릴레이 FR, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(3) 플리커릴레이 FR의 설정시간 간격으로 전자접촉기 MC1과 MC2가 교대로 여자되어, 전동기 M1과 M2가 교대로 회전하고 램프 RL과 GL이 교대로 점등된다.", "(4) 전동기가 운전하는 중 푸시버튼 스위치 PB0를 누르거나 셀렉터 스위치 SS를 A(자동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "라) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 부저 BZ가 동작되고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "4": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 초기 운전 조건: 타이머 T의 설정시간은 플리커릴레이 FR의 설정시간 보다 작아야 한다(즉, 타이머 설정시간 < 플리커릴레이 설정시간).", "다) 자동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 A(자동) 위치에 놓으면 플로트레스 스위치 FLS에 전원이 공급되고, 플로트레스 스위치 FLS의 수위 감지가 동작되면, 릴레이 X, 플리커릴레이 FR이 여자된다.", "(2) 플리커릴레이 FR의 설정시간 간격으로 전자접촉기 MC1과 전자접촉기 MC2, 타이머 T가 교대로 여자되고, 타이머 T의 설정시간 t초 후, 전자접촉기 MC2가 소자된다. 아래의 ① → ② → ③의 순으로 계속 반복 동작한다. ① 전동기 M1이 회전, M2가 정지하고 램프 RL이 점등, GL이 소등 ② 전동기 M1이 정지, M2가 회전하고 램프 RL이 소등, GL이 점등 ③ 전동기 M1과 M2가 정지하고 램프 RL과 GL이 소등", "(3) 전동기가 운전하는 중 플로트레스 스위치 FLS의 수위 감지가 해제되거나 셀렉터 스위치 SS를 M(수동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "라) 수동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 M(수동) 위치에 놓은 상태에서, 푸시버튼 스위치 PB1을 누르면, 릴레이 X, 플리커릴레이 FR이 여자된다.", "(2) 자동 운전 동작 사항 다)의 (2)와 같다.", "(3) 전동기가 운전하는 중 푸시버튼 스위치 PB0를 누르거나 셀렉터 스위치 SS를 A(자동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "마) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 부저 BZ가 동작되고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "5": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 자동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 A(자동) 위치에 놓으면 플로트레스 스위치 FLS에 전원이 공급되고, 플로트레스 스위치 FLS의 수위 감지가 동작되면, 타이머 T, 릴레이 X, 플리커릴레이 FR이 여자되고, 플리커릴레이 FR의 설정시간 간격으로 전자접촉기 MC1과 MC2가 교대로 여자되어 전동기 M1, 램프 RL과 전동기 M2, 램프 GL이 교대로 동작한다.", "(2) 타이머 T의 설정시간 t초 후, 플리커릴레이 FR이 소자되고, 전자접촉기 MC1, MC2가 여자되어, 전동기 M1, M2가 회전하고 램프 RL, GL이 점등된다.", "(3) 전동기가 운전하는 중 플로트레스 스위치 FLS의 수위 감지가 해제되거나 셀렉터 스위치 SS를 M(수동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "다) 수동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 M(수동) 위치에 놓은 상태에서, 푸시버튼 스위치 PB1을 누르면, 타이머 T, 릴레이 X, 플리커릴레이 FR이 여자되고, 플리커릴레이 FR의 설정시간 간격으로 전자접촉기 MC1과 MC2가 교대로 여자되어 전동기 M1, 램프 RL과 전동기 M2, 램프 GL이 교대로 동작한다.", "(2) 자동 운전 동작 사항 나)의 (2)와 같다.", "(3) 전동기가 운전하는 중 푸시버튼 스위치 PB0를 누르거나 셀렉터 스위치 SS를 A(자동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "라) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 부저 BZ가 동작되고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "6": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 자동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 A(자동) 위치에 놓으면 플로트레스 스위치 FLS에 전원이 공급되고, 플로트레스 스위치 FLS의 수위 감지가 동작되면, 릴레이 X, MC1, MC2가 여자되어, 전동기 M1, M2가 회전하고 램프 RL, GL이 점등된다.", "(2) 전동기가 운전하는 중 플로트레스 스위치 FLS의 수위 감지가 해제되거나 셀렉터 스위치 SS를 M(수동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "다) 수동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 M(수동) 위치에 놓은 상태에서, 푸시버튼 스위치 PB1을 누르면, 타이머 T, MC1, MC2가 여자되어, 전동기 M1, M2가 회전하고 램프 RL, GL이 점등된다.", "(2) 타이머 T의 설정시간 t초 후, 전자접촉기 MC2가 소자되어, 전동기 M2가 정지하고 램프 GL이 소등되며, 플리커릴레이 FR이 여자되고, 플리커릴레이 FR의 설정시간 간격으로 전자접촉기 MC1과 MC2가 교대로 여자되어 전동기 M1, 램프 RL과 전동기 M2, 램프 GL이 교대로 동작한다.", "(3) 전동기가 운전하는 중 푸시버튼 스위치 PB0를 누르거나 셀렉터 스위치 SS를 A(자동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "라) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 부저 BZ가 동작되고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "7": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 초기 운전 조건: 타이머 T의 설정시간은 플리커릴레이 FR의 설정시간 보다 작아야 한다(즉, 타이머 설정시간 < 플리커릴레이 설정시간).", "다) 자동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 A(자동) 위치에 놓으면 플로트레스 스위치 FLS에 전원이 공급되고, 플로트레스 스위치 FLS의 수위 감지가 동작되면, 릴레이 X, 플리커릴레이 FR, 타이머 T, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(2) 플리커릴레이 FR의 설정시간 동안 타이머 T, 전자접촉기 MC1이 여자되고, 타이머 T의 설정시간 t초 후, 전자접촉기 MC1이 소자되고, 전자접촉기 MC2가 여자된다. 아래의 ① → ② → ③의 순으로 계속 반복 동작한다. ① 전동기 M1이 회전하고 램프 RL이 점등 ② 전동기 M1이 정지, M2가 회전하고 램프 RL이 소등, GL이 점등 ③ 전동기 M1과 M2가 정지하고 램프 RL과 GL이 소등", "(3) 전동기가 운전하는 중 플로트레스 스위치 FLS의 수위 감지가 해제되거나 셀렉터 스위치 SS를 M(수동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "라) 수동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 M(수동) 위치에 놓은 상태에서, 푸시버튼 스위치 PB1을 누르면, 릴레이 X, 플리커릴레이 FR, 타이머 T, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(2) 자동 운전 동작 사항 다)의 (2)와 같다.", "(3) 전동기가 운전하는 중 푸시버튼 스위치 PB0를 누르거나 셀렉터 스위치 SS를 A(자동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "마) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 부저 BZ가 동작되고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "8": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 자동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 A(자동) 위치에 놓으면 플로트레스 스위치 FLS에 전원이 공급되고, 플로트레스 스위치 FLS의 수위 감지가 동작되면, 플리커릴레이 FR, 릴레이 X, 전자접촉기 MC1, MC2가 여자되어, 전동기 M1, M2가 회전하고 램프 RL, GL, YL이 점등된다.", "(2) 플리커릴레이 FR의 설정시간 간격으로 램프 YL이 점멸된다.", "(3) 전동기가 운전하는 중 플로트레스 스위치 FLS의 수위 감지가 해제되거나 셀렉터 스위치 SS를 M(수동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "다) 수동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 M(수동) 위치에 놓은 상태에서, 푸시버튼 스위치 PB1을 누르면, 타이머 T, 전자접촉기 MC1, MC2가 여자되어, 전동기 M1, M2가 회전하고 램프 RL, GL이 점등된다.", "(2) 타이머 T의 설정시간 t초 후, 전자접촉기 MC1, MC2가 소자되어, 전동기 M1, M2가 정지하고 램프 RL, GL이 소등된다.", "(3) 전동기가 운전하는 중 또는 타이머에 의해 정지된 상태에서 푸시버튼 스위치 PB0를 누르거나 셀렉터 스위치 SS를 A(자동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "라) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 부저 BZ가 동작된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "9": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 자동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 A(자동) 위치에 놓으면 플로트레스 스위치 FLS에 전원이 공급되고, 플로트레스 스위치 FLS의 수위 감지가 동작되면, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(2) 전동기가 운전하는 중 플로트레스 스위치 FLS의 수위 감지가 해제되거나 셀렉터 스위치 SS를 M(수동) 위치에 놓으면, 제어회로 및 전동기 M1은 정지된다.", "다) 수동 운전 동작 사항", "(1) 셀렉터 스위치 SS를 M(수동) 위치에 놓은 상태에서, 푸시버튼 스위치 PB1을 누르면, 릴레이 X, 타이머 T, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고 램프 RL이 점등된다.", "(2) 타이머 T의 설정시간 t초 후, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고 램프 GL이 점등된다.", "(3) 전동기가 운전하는 중 푸시버튼 스위치 PB0를 누르거나 셀렉터 스위치 SS를 A(자동) 위치에 놓으면, 제어회로 및 전동기의 동작은 모두 정지된다.", "라) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 플리커릴레이 FR이 여자되고, 부저 BZ가 동작된다.", "(2) 플리커릴레이 FR의 설정시간 간격으로 부저 BZ와 램프 YL이 교대로 동작된다.", "(3) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "10": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 푸시버튼 스위치 PB1 동작 사항", "(1) 푸시버튼 스위치 PB1을 누르면, 릴레이 X1이 여자되어, 램프 WL이 점등된다.", "(2) 릴레이 X1이 여자된 상태에서 리밋스위치 LS1이 감지되면, 타이머 T1이 여자된다.", "(3) 타이머 T1의 설정시간 t1초 후, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고, 램프 RL이 점등, 램프 WL이 소등된다.", "(4) 전동기 M1이 회전하는 중, 리밋스위치 LS1의 감지가 해제되면, 타이머 T1, 전자접촉기 MC1이 소자되어, 전동기 M1은 정지하고 램프 RL은 소등, 램프 WL은 점등된다.", "다) 푸시버튼 스위치 PB2 동작 사항", "(1) 푸시버튼 스위치 PB2를 누르면, 릴레이 X2가 여자되어, 램프 WL이 점등된다.", "(2) 릴레이 X2가 여자된 상태에서 리밋스위치 LS2가 감지되면, 타이머 T2가 여자된다.", "(3) 타이머 T2의 설정시간 t2초 후, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등, 램프 WL이 소등된다.", "(4) 전동기 M2가 회전하는 중, 리밋스위치 LS2의 감지가 해제되면, 타이머 T2, 전자접촉기 MC2가 소자되어, 전동기 M2는 정지하고 램프 GL은 소등, 램프 WL은 점등된다.", "라) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "마) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "11": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 푸시버튼 스위치 PB1 동작 사항", "(1) 푸시버튼 스위치 PB1을 누르면, 릴레이 X1, 타이머 T1이 여자되어 램프 WL이 점등되고, 타이머 T1의 설정시간 t1초 이상 푸시버튼 스위치 PB1을 누르고 있어야 타이머 T1에 의해 회로가 자기유지된다. (이때, 타이머 T2, 릴레이 X2가 소자된다.)", "(2) 릴레이 X1이 여자된 상태에서 리밋스위치 LS1이 감지되면, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고, 램프 RL이 점등, 램프 WL이 소등된다.", "(3) 전동기 M1이 회전하는 중, 리밋스위치 LS1의 감지가 해제되면, 전자접촉기 MC1이 소자되어, 전동기 M1은 정지하고, 램프 RL은 소등, 램프 WL은 점등된다.", "다) 푸시버튼 스위치 PB2 동작 사항", "(1) 푸시버튼 스위치 PB2를 누르면, 릴레이 X2, 타이머 T2가 여자되며 램프 WL이 점등되고, 타이머 T2의 설정시간 t2초 이상 푸시버튼 스위치 PB2를 누르고 있어야 타이머 T2에 의해 회로가 자기유지된다. (이때, 타이머 T1, 릴레이 X1이 소자된다.)", "(2) 릴레이 X2가 여자된 상태에서 리밋스위치 LS2가 감지되면, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등, 램프 WL이 소등된다.", "(3) 전동기 M2가 회전하는 중, 리밋스위치 LS2의 감지가 해제되면, 전자접촉기 MC2가 소자되어, 전동기 M2는 정지하고, 램프 GL은 소등, 램프 WL은 점등된다.", "라) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "마) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "12": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 푸시버튼 스위치 PB1 동작 사항", "(1) 푸시버튼 스위치 PB1을 누르면, 릴레이 X1, 타이머 T1이 여자되어, 램프 WL이 점등된다.", "(2) 릴레이 X1이 여자된 상태 (가) 리밋스위치 LS1이 감지되면, ① 전자접촉기 MC1이 여자되어, 타이머 T1이 소자되며 전동기 M1이 회전하고, 램프 RL이 점등, WL이 소등된다. ② 전동기 M1이 회전하는 중, 리밋스위치 LS1의 감지가 해제되면, 타이머 T1이 여자, 전자접촉기 MC1이 소자되어, 전동기 M1은 정지하고 램프 RL은 소등, WL은 점등된다. (나) 리밋스위치 LS1이 감지되지 않으면, ① 타이머 T1의 설정시간 t1초 후, 릴레이 X2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등된다.", "다) 푸시버튼 스위치 PB2 동작 사항", "(1) 푸시버튼 스위치 PB2를 누르면, 릴레이 X2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등된다.", "(2) 릴레이 X2가 여자된 상태에서 리밋스위치 LS2가 감지되면, 타이머 T2가 여자되어 램프 WL이 점등된다.", "(3) 타이머 T2의 설정시간 t2초 후, 릴레이 X1, 타이머 T1이 여자된다.", "(4) 릴레이 X1이 여자된 상태에서 리밋스위치 LS1이 감지되면, 전자접촉기 MC1이 여자되어, 타이머 T1이 소자되며 전동기 M1이 회전하고, 램프 RL이 점등된다.", "라) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "마) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "13": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 푸시버튼 스위치 PB1 동작 사항", "(1) 푸시버튼 스위치 PB1을 누르거나 리밋스위치 LS1이 순간 감지된 후 해제(OFF→ON→OFF)되면, 릴레이 X1, 타이머 T1이 여자되어, 램프 WL이 점등된다.", "(2) 릴레이 X1이 여자된 상태 (가) 리밋스위치 LS2가 감지되면, ① 전자접촉기 MC1이 여자되어, 타이머 T1이 소자되며 전동기 M1이 회전하고, 램프 RL이 점등, WL이 소등된다. ② 전동기 M1이 회전하는 중, 리밋스위치 LS2의 감지가 해제되면, 타이머 T1이 여자, 전자접촉기 MC1이 소자되어, 전동기 M1은 정지하고 램프 RL은 소등, WL은 점등된다. (나) 리밋스위치 LS2가 감지되지 않으면, ① 타이머 T1의 설정시간 t1초 후, 릴레이 X2, 타이머 T2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등된다. ② 타이머 T2의 설정시간 t2초 후, 릴레이 X1, 타이머 T1, T2가 소자되고, 램프 WL이 소등된다.", "(3) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "다) 푸시버튼 스위치 PB2 동작 사항", "(1) 푸시버튼 스위치 PB2를 누르면, 릴레이 X2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등된다. (이때, 전동기 M1이 운전 중이면 WL이 점등된다.)", "(2) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "라) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "14": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급되고, 램프 WL이 점등된다.", "나) 푸시버튼 스위치 PB1 동작 사항", "(1) 리밋스위치 LS1과 LS2가 모두 감지된 상태에서 푸시버튼 스위치 PB1을 누르면, 타이머 T1, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고, 램프 RL이 점등, 램프 WL이 소등된다.", "(2) 전동기 M1이 회전 상태 (가) 타이머 T1의 설정시간 t1초 후, 타이머 T1, 전자접촉기 MC1이 소자되어, 전동기 M1이 정지하고, 램프 RL이 소등, 램프 WL이 점등된다. (나) 리밋스위치 LS1과 LS2 중 어떤 하나라도 감지가 해제되면, 타이머 T1, 전자접촉기 MC1이 소자되어, 전동기 M1이 정지하고, 램프 RL이 소등, 램프 WL이 점등된다.", "다) 푸시버튼 스위치 PB2 동작 사항", "(1) 리밋스위치 LS1 또는 LS2 중 어떤 하나 이상이 감지된 상태에서 푸시버튼 스위치 PB2를 누르면, 타이머 T2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등, 램프 WL이 소등된다.", "(2) 전동기 M2가 회전 상태 (가) 타이머 T2의 설정시간 t2초 후, 타이머 T2, 전자접촉기 MC2가 소자되어, 전동기 M2가 정지하고, 램프 GL이 소등, 램프 WL이 점등된다. (나) 리밋스위치 LS1과 LS2의 감지가 모두 해제되면, 타이머 T2, 전자접촉기 MC2가 소자되어, 전동기 M2가 정지하고, 램프 GL이 소등, 램프 WL이 점등된다.", "라) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "마) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "15": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급되고, 램프 WL이 점등된다.", "나) 푸시버튼 스위치 PB1 동작 사항", "(1) 리밋스위치 LS1 또는 LS2 중 어떤 하나 이상이 감지된 상태에서 푸시버튼 스위치 PB1을 누르면, 타이머 T1, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고, 램프 RL이 점등, 램프 WL이 소등된다.", "(2) 전동기 M1이 회전 상태 (가) 타이머 T1의 설정시간 t1초 후, 타이머 T1, 전자접촉기 MC1이 소자되어, 전동기 M1이 정지하고, 램프 RL이 소등, 램프 WL이 점등된다. (나) 리밋스위치 LS1과 LS2의 감지가 모두 해제되어도 동작의 변화는 없다.", "다) 푸시버튼 스위치 PB2 동작 사항", "(1) 리밋스위치 LS1과 LS2가 모두 감지된 상태에서 푸시버튼 스위치 PB2를 누르면, 타이머 T2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등, 램프 WL이 소등된다.", "(2) 전동기 M2가 회전 상태 (가) 타이머 T2의 설정시간 t2초 후, 타이머 T2, 전자접촉기 MC2가 소자되어, 전동기 M2가 정지하고, 램프 GL이 소등, 램프 WL이 점등된다. (나) 리밋스위치 LS1과 LS2의 감지가 모두 해제되어도 동작의 변화는 없다.", "라) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "마) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "16": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 푸시버튼 스위치 PB1 동작 사항", "(1) 리밋스위치 LS1이 감지되면, 타이머 T1이 여자되고, 푸시버튼 스위치 PB2 또는 타이머 T2에 의한 전동기 M2의 동작이 가능한 상태로 된다.", "(2) 푸시버튼 스위치 PB1을 누르거나 타이머 T1의 설정시간 t1초 후, 릴레이 X1, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고, 램프 RL이 점등된다.", "(3) 리밋스위치 LS1의 감지가 해제되어도 전동기 M1에 대한 동작의 변화는 없다.", "다) 푸시버튼 스위치 PB2 동작 사항", "(1) 리밋스위치 LS1이 감지된 상태 (가) 푸시버튼 스위치 PB2를 누르면, 릴레이 X2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등된다. (나) 리밋스위치 LS2가 감지되면, ① 타이머 T2, 릴레이 X2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하며 램프 GL이 점등된다. ② 타이머 T2의 설정시간 t2초 후, 전자접촉기 MC2가 소자되어, 전동기 M2가 정지하고, 램프 GL이 소등, 램프 WL이 점등된다. ③ 리밋스위치 LS2의 감지가 해제되면, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하며 램프 GL이 점등, 램프 WL이 소등된다.", "라) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "마) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "17": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 푸시버튼 스위치 PB1 동작 사항", "(1) 리밋스위치 LS1과 LS2 중 어떤 하나만 감지된 상태에서 푸시버튼 스위치 PB1을 누르면, 타이머 T1, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고, 램프 RL이 점등된다.", "(2) 전동기 M1이 회전 상태 (가) 타이머 T1의 설정시간 t1초 후, 푸시버튼 스위치 PB2에 의한 동작이 허가된다. (나) 리밋스위치 LS1과 LS2가 모두 감지되거나 감지가 모두 해제되면, 타이머 T1, 전자접촉기 MC1이 소자되어, 전동기 M1이 정지하고, 램프 RL이 소등된다. (다) 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "다) 푸시버튼 스위치 PB2 동작 사항", "(1) 타이머 T1이 여자되고 타이머 T1의 설정시간 t1초 후, 푸시버튼 스위치 PB2를 누르면, 타이머 T2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등된다.", "(2) 타이머 T2의 설정시간 t2초 후, 전자접촉기 MC2가 소자되어, 전동기 M2가 정지하고, 램프 GL이 소등, 램프 WL이 점등된다.", "(3) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "라) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."], "18": ["가) MCCB를 통해 전원을 투입하면, 전자식과전류계전기 EOCR에 전원이 공급된다.", "나) 푸시버튼 스위치 PB1 동작 사항", "(1) 리밋스위치 LS1은 감지된 상태, 리밋스위치 LS2는 감지가 해제된 상태에서 푸시버튼 스위치 PB1을 누르면, 타이머 T1, 전자접촉기 MC1이 여자되어, 전동기 M1이 회전하고, 램프 RL이 점등된다.", "(2) 타이머 T1의 설정시간 t1초 후, 램프 WL이 점등된다.", "(3) 리밋스위치 LS1과 LS2의 감지가 변해도 동작의 변화는 없다.", "다) 푸시버튼 스위치 PB2 동작 사항", "(1) 리밋스위치 LS1은 감지가 해제된 상태, 리밋스위치 LS2는 감지된 상태에서 푸시버튼 스위치 PB2를 누르면, 타이머 T2, 전자접촉기 MC2가 여자되어, 전동기 M2가 회전하고, 램프 GL이 점등된다.", "(2) 타이머 T2의 설정시간 t2초 후, 램프 WL이 점등된다.", "(3) 리밋스위치 LS1과 LS2의 감지가 변해도 동작의 변화는 없다.", "라) 제어회로가 동작하는 중 푸시버튼 스위치 PB0를 누르면, 제어회로 및 전동기 동작은 모두 정지된다.", "마) EOCR 동작 사항", "(1) 전동기가 운전하는 중 전동기의 과부하로 과전류가 흐르면, 전자식과전류계전기 EOCR이 동작되어 전동기는 정지하고, 램프 YL이 점등된다.", "(2) 전자식과전류계전기 EOCR을 리셋(RESET)하면 제어회로는 초기 상태로 복귀된다.", "※ 동작 내용은 단순 참고 사항이며, 모든 동작은 시퀀스 회로를 기준으로 합니다."]};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const snapv=v=>Math.round(v/10)*10;
+const NS='http://www.w3.org/2000/svg';
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}},del(k){try{localStorage.removeItem(k);}catch(e){}}};
+
+/* ---------- 전선 (공개문제 지급재료 기준) ---------- */
+const WIRE_COLORS=[
+  {k:'y',name:'황',hex:'#e9c21a',note:'제어 1.5mm²'},{k:'br',name:'갈',hex:'#7b4a22',note:'주회로 L1'},{k:'k',name:'흑',hex:'#1e1f20',note:'주회로 L2'},
+  {k:'gy',name:'회',hex:'#8d9398',note:'주회로 L3'},{k:'ge',name:'녹황',hex:'#2f9a45',stripe:'#e9c21a',note:'보호도체 PE'}];
+const WC=Object.fromEntries(WIRE_COLORS.map(c=>[c.k,c]));
+
+/* ---------- 기구 정의 (공개문제 5) 기구의 내부 결선도 기준) ----------
+   els: [종류, 단자, 단자] */
+const KIND={coil:'코일',no:'a접점',nc:'b접점',ino:'순시 a접점',tno:'한시 a접점',tnc:'한시 b접점',fno:'플리커 a접점',fnc:'플리커 b접점',cond:'내부 연결',pwr:'조작 전원',lamp:'램프',buzzer:'부저',ls1:'LS1 접점',ls2:'LS2 접점'};
+const LOADS=new Set(['coil','pwr','lamp','buzzer']);
+const SP=22;
+function sockPins(n){
+  if(n===12){const a=[];for(let i=0;i<6;i++)a.push({k:''+(i+1),x:18+SP*i,y:12});for(let i=0;i<6;i++)a.push({k:''+(i+7),x:18+SP*i,y:88});return a;}
+  return [['6',0,12],['5',1,12],['4',2,12],['3',3,12],['7',0,88],['8',1,88],['1',2,88],['2',3,88]].map(([k,i,y])=>({k,x:18+SP*i,y}));
+}
+const DEFS={
+  tbp:{name:'전원 단자대',prefix:'TB1',w:150,h:62,pins:[['L1',22,44],['L2',57,44],['L3',92,44],['PE',127,44]],els:[]},
+  tbm:{name:'전동기 단자대',prefix:'TB',w:150,h:160,pins:[['U',22,14],['V',57,14],['W',92,14],['PE',127,14]],els:[]},
+  tbf:{name:'플로트레스 단자대',prefix:'TB4',w:150,h:178,pins:[['E1',22,14],['E2',57,14],['E3',92,14],['4',127,14]],els:[]},
+  tbl:{name:'리밋스위치 단자대',prefix:'TB4',w:150,h:120,pins:[['1',22,14],['2',57,14],['3',92,14],['4',127,14]],els:[['ls1','1','2'],['ls2','3','4']]},
+  tb20:{name:'단자대 10P+10P',prefix:'TB',w:12+30*20,h:80},
+  mccb:{name:'배선용 차단기',prefix:'MCCB',w:96,h:130,pins:[['1',22,12],['3',48,12],['5',74,12],['2',22,118],['4',48,118],['6',74,118]],els:[['no','1','2'],['no','3','4'],['no','5','6']]},
+  fuse:{name:'퓨즈 및 퓨즈홀더',prefix:'F',w:72,h:110,cap:1,pins:[['1',22,12],['2',50,12],['3',22,98],['4',50,98]],els:[['cond','1','3'],['cond','2','4']]},
+  mc:{name:'전자접촉기 12P',prefix:'MC',sock:12,els:[['no','1','7'],['no','2','8'],['no','3','9'],['no','4','10'],['nc','5','11'],['coil','6','12']]},
+  eocr:{name:'EOCR 12P',prefix:'EOCR',sock:12,els:[['cond','1','7'],['cond','2','8'],['cond','3','9'],['nc','4','10'],['no','5','11'],['cond','10','11'],['pwr','6','12']]},
+  relay:{name:'릴레이 8P',prefix:'X',sock:8,els:[['coil','2','7'],['no','1','3'],['nc','1','4'],['no','8','6'],['nc','8','5']]},
+  timer:{name:'타이머 8P',prefix:'T',sock:8,set:3,els:[['coil','2','7'],['ino','1','3'],['tno','8','6'],['tnc','8','5']]},
+  flicker:{name:'플리커릴레이 8P',prefix:'FR',sock:8,set:1,els:[['coil','2','7'],['fno','8','6'],['fnc','8','5']]},
+  fls:{name:'플로트레스 스위치 8P',prefix:'FLS',sock:8,pinNames:{'7':'E1','8':'E2','1':'E3'},els:[['pwr','5','6'],['no','4','3'],['nc','4','2']]},
+  pbg:{name:'푸시버튼 (녹)',prefix:'PB',cap:1,col:'#2f9b4c',w:60,h:96,pins:[['a1',18,12],['a2',42,12],['b1',18,84],['b2',42,84]],els:[['no','a1','a2'],['nc','b1','b2']]},
+  pbr:{name:'푸시버튼 (적)',prefix:'PB',cap:1,col:'#d2352b',w:60,h:96,pins:[['a1',18,12],['a2',42,12],['b1',18,84],['b2',42,84]],els:[['no','a1','a2'],['nc','b1','b2']]},
+  ss:{name:'셀렉터 스위치',prefix:'SS',cap:1,w:60,h:96,pins:[['a1',18,12],['a2',42,12],['b1',18,84],['b2',42,84]],els:[['no','a1','a2'],['nc','b1','b2']]},
+  rl:{name:'램프 (적)',prefix:'RL',cap:1,lamp:'#ff4434',dim:'#6e2a24',w:60,h:78,pins:[['1',18,66],['2',42,66]],els:[['lamp','1','2']]},
+  gl:{name:'램프 (녹)',prefix:'GL',cap:1,lamp:'#37d06a',dim:'#24553a',w:60,h:78,pins:[['1',18,66],['2',42,66]],els:[['lamp','1','2']]},
+  yl:{name:'램프 (황)',prefix:'YL',cap:1,lamp:'#ffd02a',dim:'#6b5a1f',w:60,h:78,pins:[['1',18,66],['2',42,66]],els:[['lamp','1','2']]},
+  wl:{name:'램프 (백)',prefix:'WL',cap:1,lamp:'#fffbe8',dim:'#a9a79c',w:60,h:78,pins:[['1',18,66],['2',42,66]],els:[['lamp','1','2']]},
+  bz:{name:'부저',prefix:'BZ',cap:1,w:60,h:78,pins:[['1',18,66],['2',42,66]],els:[['buzzer','1','2']]},
+};
+for(const [k,d] of Object.entries(DEFS)){
+  d.type=k;
+  if(d.sock){d.w=d.sock===12?36+SP*5:36+SP*3;d.h=100;d.pins=sockPins(d.sock);d.draw=drawSock;}
+  else if(k==='tb20'){d.cap=1;d.pins=[];d.els=[];for(let i=1;i<=20;i++){const x=21+30*(i-1);d.pins.push({k:''+i,x,y:12},{k:i+"'",x,y:68});d.els.push(['cond',''+i,i+"'"]);}d.draw=drawTB20;}
+  else d.pins=d.pins.map(a=>({k:a[0],x:a[1],y:a[2]}));
+}
+Object.assign(DEFS.tbp,{draw:drawTBP,cap:1});Object.assign(DEFS.tbm,{draw:drawTBM,cap:1});Object.assign(DEFS.tbf,{draw:drawTBF,cap:1});Object.assign(DEFS.tbl,{draw:drawTBL,cap:1});
+DEFS.mccb.draw=drawMccb;DEFS.fuse.draw=drawFuse;DEFS.pbg.draw=DEFS.pbr.draw=drawPB;DEFS.ss.draw=drawSS;
+for(const k of ['rl','gl','yl','wl'])DEFS[k].draw=drawLamp;DEFS.bz.draw=drawBz;
+
+let PINMAP=store.get('cpw2.pinmap',{});
+const elsOf=t=>PINMAP[t]||DEFS[t].els;
+
+/* ---------- 공개문제 배치 (2) 제어판 내부 기구 배치도) ---------- */
+const LAYOUT={
+  1:['F EOCR MCCB X FR','T FLS MC1 MC2'],2:['EOCR MCCB F X FR','MC1 MC2 T FLS'],3:['MCCB EOCR F X FR','T FLS MC1 MC2'],
+  4:['MCCB EOCR FR X F','FLS MC1 MC2 T'],5:['EOCR F MCCB FR X','MC1 MC2 FLS T'],6:['EOCR MCCB F X FR','FLS T MC1 MC2'],
+  7:['MCCB F EOCR FR X','FLS T MC1 MC2'],8:['F MCCB EOCR X FR','MC1 MC2 T FLS'],9:['MCCB EOCR F FR X','T MC1 MC2 FLS'],
+  10:['MCCB EOCR X2 X1 F','T1 T2 MC1 MC2'],11:['EOCR MCCB F X2 X1','MC1 MC2 T2 T1'],12:['F MCCB EOCR X1 X2','T2 T1 MC1 MC2'],
+  13:['EOCR MCCB F X1 X2','T1 MC1 MC2 T2'],14:['F MCCB EOCR X2 X1','T2 T1 MC1 MC2'],15:['MCCB EOCR F X2 X1','T2 MC1 MC2 T1'],
+  16:['MCCB EOCR X1 X2 F','T2 MC1 MC2 T1'],17:['MCCB F EOCR X1 X2','MC1 MC2 T1 T2'],18:['MCCB EOCR F X1 X2','T2 MC1 MC2 T1']};
+const typeOf=l=>l==='F'?'fuse':l==='EOCR'?'eocr':l==='MCCB'?'mccb':l==='FR'?'flicker':l==='FLS'?'fls':/^MC/.test(l)?'mc':/^X/.test(l)?'relay':/^T\d?$/.test(l)?'timer':null;
+function buildProblem(n){
+  const parts=[];let id=1;
+  const add=(type,label,x,y,extra)=>{const p={id:'p'+id++,type,label,x,y,...(extra||{})};if(DEFS[type].set!=null)p.set=DEFS[type].set;parts.push(p);};
+  const tw=DEFS.tb20.w;
+  add('tb20','TB5',snapv(500-tw/2),85);add('tb20','TB6',snapv(500-tw/2),885);
+  LAYOUT[n].forEach((row,ri)=>{
+    const labs=row.split(' '),ds=labs.map(l=>DEFS[typeOf(l)]),sum=ds.reduce((a,d)=>a+d.w,0),gap=(860-sum)/(labs.length-1),cy=ri?687:362;
+    let x=70;labs.forEach((l,i)=>{add(ds[i].type,l,snapv(x),snapv(cy-ds[i].h/2));x+=ds[i].w+gap;});
+  });
+  const A=n<=9;
+  add('tbp','TB1',430,-250);
+  add('tbm','TB3',40,1140,{sub:'M2'});add('tbm','TB2',810,1140,{sub:'M1'});
+  add(A?'tbf':'tbl','TB4',425,1140);
+  if(A){add('pbg','PB1',-470,60);add('pbr','PB0',-390,60);add('ss','SS',-280,60);add('yl','YL',-470,420);add('bz','BZ',-390,420);}
+  else{add('pbr','PB0',-470,60);add('pbg','PB1',-390,60);add('pbg','PB2',-310,60);add('yl','YL',-470,420);add('wl','WL',-390,420);}
+  add('rl','RL',1120,60);add('gl','GL',1200,60);
+  return {parts,wires:[],nextId:id+1};
+}
+
+/* ---------- 그리기 ---------- */
+const T=(x,y,s,c,a='')=>`<text x="${x}" y="${y}" class="${c}" ${a}>${esc(s)}</text>`;
+function led(x,y,on,c){return (on?`<circle cx="${x}" cy="${y}" r="8.5" fill="${c}" opacity=".4"/>`:'')+`<circle cx="${x}" cy="${y}" r="4.2" fill="${on?c:'#53575a'}" stroke="#1d1f21" stroke-width=".7"/>`;}
+const band=(d,c)=>`<rect x="5" y="33" width="${d.w-10}" height="34" rx="3" fill="${c}"/>`;
+const FACE={
+  mc:(p,d,r)=>band(d,'#e2e3dc')+T(11,48,p.label,'tl')+T(11,61,'전자접촉기 12P','ts')+led(d.w-15,44,r.coil,'#ff3b2f'),
+  eocr:(p,d,r)=>band(d,'#24508e')+T(11,48,p.label,'tlw')+T(11,61,r.trip?'TRIP · 눌러서 리셋':(r.powered?'정상 감시 중':'EOCR 12P'),'tsl')+led(d.w-15,44,r.trip,'#ff3b2f')+led(d.w-29,44,r.powered,'#4be27a'),
+  relay:(p,d,r)=>band(d,'#d3dadd')+T(11,48,p.label,'tl')+T(11,61,'릴레이 8P','ts')+led(d.w-15,44,r.coil,'#3fdc72'),
+  timer:(p,d,r)=>{const set=+p.set||0,t=Math.min(r.t||0,set);return band(d,'#eeede5')+T(11,48,p.label,'tl')+T(11,61,mode==='sim'?`${t.toFixed(1)}/${set}s`:`설정 ${set}s`,'ts')+led(d.w-15,44,r.done,'#ff9a1f')+`<rect x="9" y="63" width="${(d.w-18)*(set?t/set:0)}" height="2" fill="#e07a00"/>`;},
+  flicker:(p,d,r)=>band(d,'#eeede5')+T(11,48,p.label,'tl')+T(11,61,`${p.set}s 간격`,'ts')+led(d.w-15,44,r.coil&&r.flip,'#ffb21f')+led(d.w-29,44,r.coil&&!r.flip,'#ffb21f'),
+  fls:(p,d,r)=>band(d,'#dde8ef')+T(11,48,p.label,'tl')+T(11,61,r.powered?(r.flsOn?'수위 감지':'감지 안 됨'):'플로트레스','ts')+led(d.w-15,44,r.flsOn,'#3fdc72'),
+};
+function drawSock(p,d,r){
+  let s=`<rect width="${d.w}" height="${d.h}" rx="6" fill="#2a2d30"/><rect x="2" y="2" width="${d.w-4}" height="${d.h-4}" rx="5" fill="none" stroke="#44494d"/>`;
+  for(const q of d.pins){const top=q.y<d.h/2;s+=T(q.x,top?q.y+18:q.y-11,q.k,'tn');const nm=d.pinNames&&d.pinNames[q.k];if(nm)s+=T(q.x,top?-5:d.h+12,nm,'tnd');}
+  return s+FACE[p.type](p,d,r);
+}
+function strip(d,labels,y0=0){let s=`<rect y="${y0}" width="${d.w}" height="50" rx="4" fill="#33373a"/>`;d.pins.forEach((q,i)=>{s+=T(q.x,y0+40,labels[i],'tnb');if(i)s+=`<line x1="${q.x-17.5}" y1="${y0+4}" x2="${q.x-17.5}" y2="${y0+46}" stroke="#4b5054"/>`;});return s;}
+function drawTBP(p,d){
+  let s=`<rect width="150" height="62" rx="4" fill="#33373a"/>`+led(140,10,sim.power,'#ff3b2f');
+  const lab=['L1','L2','L3','PE'];d.pins.forEach((q,i)=>{s+=T(q.x,24,lab[i],'tnb');if(i)s+=`<line x1="${q.x-17.5}" y1="30" x2="${q.x-17.5}" y2="58" stroke="#4b5054"/>`;});
+  return s+T(75,-8,'3P3W AC 220V','tcx');
+}
+function drawTBM(p,d,r){
+  const n=(p.sub||'').replace('M','');
+  let s=strip(d,['U'+n,'V'+n,'W'+n,'PE']);
+  s+=`<line x1="22" y1="50" x2="60" y2="80" stroke="#6b7276" stroke-width="2"/><line x1="57" y1="50" x2="75" y2="74" stroke="#6b7276" stroke-width="2"/><line x1="92" y1="50" x2="90" y2="80" stroke="#6b7276" stroke-width="2"/>`;
+  const cls=r.run>0?'cw':r.run<0?'ccw':'';
+  s+=`<circle cx="75" cy="112" r="40" fill="#4a6276"/><circle cx="75" cy="112" r="31" fill="#253441"/><g class="rot ${cls}"><circle cx="75" cy="112" r="26" fill="transparent"/>`;
+  for(let i=0;i<4;i++)s+=`<path d="M75 112 L75 88 Q85 92 81 110Z" fill="#c9d3da" transform="rotate(${i*90} 75 112)"/>`;
+  s+=`</g><circle cx="75" cy="112" r="5" fill="#eef1f3"/>`;
+  if(r.run)s+=T(135,80,r.run>0?'정회전':'역회전','tstat','fill="#1c7a3c" text-anchor="end"');
+  else if(r.warn)s+=T(140,80,r.warn,'tstat','fill="#c22d26" text-anchor="end"');
+  return s;
+}
+function drawTBF(p,d,r){
+  let s=strip(d,['E1','E2','E3','']);
+  const L=r.level||0,wy=[150,112,74][L];
+  s+=`<rect x="12" y="58" width="126" height="118" rx="6" fill="#eef4f8" stroke="#7a8b97" stroke-width="2"/><rect x="14" y="${wy}" width="122" height="${174-wy}" rx="4" fill="#5aa3e0" opacity=".85"/>`;
+  s+=`<line x1="22" y1="50" x2="22" y2="88" stroke="#30373c" stroke-width="3"/><line x1="57" y1="50" x2="57" y2="126" stroke="#30373c" stroke-width="3"/><line x1="92" y1="50" x2="92" y2="162" stroke="#30373c" stroke-width="3"/>`;
+  s+=T(118,72,['저수위','중간','만수위'][L],'tstat','fill="#24508e"');
+  return s;
+}
+function drawTBL(p,d,r){
+  let s=strip(d,['1','2','3','4']);
+  const sw=(cx,on,lab)=>`<rect x="${cx-30}" y="58" width="60" height="58" rx="6" fill="${on?'#24508e':'#3a3f44'}"/><rect x="${cx-4}" y="${on?70:60}" width="8" height="18" fill="#9aa0a5"/><circle cx="${cx}" cy="${on?68:58}" r="6" fill="#c9cdd0"/>`+T(cx,108,lab+(on?' 감지':''),'tsw');
+  return s+sw(39,r.ls1,'LS1')+sw(110,r.ls2,'LS2');
+}
+function drawTB20(p,d){
+  let s=`<rect width="${d.w}" height="${d.h}" rx="4" fill="#33373a"/><line x1="${6+30*10}" y1="2" x2="${6+30*10}" y2="${d.h-2}" stroke="#15171a" stroke-width="3"/>`;
+  for(let i=1;i<=20;i++){const x=21+30*(i-1);s+=T(x,44,i,'tnb');if(i>1&&i!==11)s+=`<line x1="${x-15}" y1="4" x2="${x-15}" y2="${d.h-4}" stroke="#4b5054"/>`;}
+  return s;
+}
+function drawMccb(p,d,r){
+  let s=`<rect width="96" height="130" rx="6" fill="#25272a"/><rect x="6" y="33" width="84" height="64" rx="4" fill="#323538"/>`+T(48,49,p.label,'tlw','text-anchor="middle"');
+  for(const q of d.pins)s+=T(q.x,q.y<60?29:108,q.k,'tn');
+  s+=`<rect x="38" y="55" width="20" height="36" rx="3" fill="#111213"/><rect x="40" y="${r.on?57:73}" width="16" height="16" rx="2" fill="${r.on?'#e2483a':'#9aa0a5'}"/>`+T(72,77,r.on?'ON':'OFF','tsw');
+  return s;
+}
+function drawFuse(p,d){
+  let s=`<rect width="72" height="110" rx="5" fill="#ebe8df" stroke="#b3ae9f"/>`;
+  for(const x of [13,41])s+=`<rect x="${x}" y="31" width="18" height="48" rx="3" fill="#f8f5eb" stroke="#a7a291"/><rect x="${x}" y="31" width="18" height="7" rx="2" fill="#c3c7ca"/><rect x="${x}" y="72" width="18" height="7" rx="2" fill="#c3c7ca"/>`;
+  for(const q of d.pins)s+=T(q.x,q.y<50?28:90,q.k,'tnd');return s;
+}
+function drawPB(p,d,r){
+  const pr=r.pressed;
+  return `<rect width="60" height="96" rx="6" fill="#2c2f32"/><circle cx="30" cy="48" r="20" fill="#b7bbbe"/><circle cx="30" cy="48" r="${pr?13:16}" fill="${d.col}"/>${pr?`<circle cx="30" cy="48" r="13" fill="#000" opacity=".25"/>`:''}<circle cx="25" cy="43" r="${pr?3:5}" fill="#fff" opacity=".35"/>`+T(30,15,'a','tsw')+T(30,87,'b','tsw');
+}
+function drawSS(p,d,r){
+  const a=r.pos?40:-40;
+  return `<rect width="60" height="96" rx="6" fill="#2c2f32"/><circle cx="30" cy="50" r="18" fill="#161718" stroke="#5a5f63" stroke-width="2"/><g transform="rotate(${a} 30 50)"><rect x="26" y="33" width="8" height="34" rx="3" fill="#d9dcde"/><circle cx="30" cy="38" r="2" fill="#d2352b"/></g>`+T(11,32,'M','tsw')+T(49,32,'A','tsw')+T(30,15,'a','tsw')+T(30,87,'b','tsw');
+}
+function drawLamp(p,d,r){
+  const on=r.lit;
+  return `<rect width="60" height="78" rx="8" fill="#2c2f32"/>${on?`<circle cx="30" cy="31" r="30" fill="${d.lamp}" opacity=".35"/>`:''}<circle cx="30" cy="31" r="21" fill="#a2a7ab"/><circle cx="30" cy="31" r="16.5" fill="${on?d.lamp:d.dim}"/><circle cx="25" cy="26" r="4.5" fill="#fff" opacity="${on?.65:.22}"/>`;
+}
+function drawBz(p,d,r){
+  let s=`<rect width="60" height="78" rx="8" fill="#2c2f32"/><circle cx="30" cy="31" r="20" fill="#141516" stroke="#6a6f73" stroke-width="2"/>`;
+  for(const [x,y] of [[30,31],[23,26],[37,26],[23,36],[37,36],[30,22],[30,40]])s+=`<circle cx="${x}" cy="${y}" r="1.8" fill="#55595d"/>`;
+  if(r.lit)s+=`<path d="M6 18q-6 13 0 26M54 18q6 13 0 26M0 12q-8 19 0 38M60 12q8 19 0 38" stroke="#ffb21f" stroke-width="2.4" fill="none"/>`;
+  return s;
+}
+
+/* ---------- 상태 ---------- */
+let prob=clamp(+store.get('cpw2.prob',1)||1,1,18);
+let S={parts:[],wires:[],nextId:1};
+let view={tx:40,ty:40,s:1};
+let mode='place',wireColor='y',sel=null,pending=null;
+let rt={};
+const sim={power:false,fault:null,uf:null,ph:null};
+const undoS=[],redoS=[];
+let answer=null,cmp=null;
+const rtOf=id=>rt[id]||(rt[id]={coil:false,t:0,done:false,flip:false,lit:false,powered:false,pressed:false,on:true,pos:0,trip:false,level:0,dir:1,flsOn:false,run:0,warn:'',ls1:false,ls2:false});
+const partById=id=>S.parts.find(p=>p.id===id);
+const wireById=id=>S.wires.find(w=>w.id===id);
+const samePin=(a,b)=>a&&b&&a.p===b.p&&a.k===b.k;
+function pinPos(e){const p=partById(e.p);if(!p)return null;const q=DEFS[p.type].pins.find(q=>q.k===e.k);return q?{x:p.x+q.x,y:p.y+q.y}:null;}
+function pinSide(e){const p=partById(e.p),d=DEFS[p.type],q=d.pins.find(q=>q.k===e.k);return q.y<d.h/2?-1:1;}
+function pinName(e){const p=partById(e.p);return p?`${p.label}:${e.k}`:'?';}
+function wireCounts(){const m={};for(const w of S.wires)for(const e of [w.a,w.b]){const k=e.p+'|'+e.k;m[k]=(m[k]||0)+1;}return m;}
+
+function snapshot(){return JSON.stringify({parts:S.parts,wires:S.wires,nextId:S.nextId});}
+function pushUndo(){undoS.push(snapshot());if(undoS.length>150)undoS.shift();redoS.length=0;updateUndo();}
+function restore(str){const o=JSON.parse(str);S.parts=o.parts;S.wires=o.wires;S.nextId=o.nextId;if(sel&&!(sel.t==='part'?partById(sel.id):wireById(sel.id)))sel=null;pending=null;afterChange();}
+function undo(){if(!undoS.length)return;redoS.push(snapshot());restore(undoS.pop());}
+function redo(){if(!redoS.length)return;undoS.push(snapshot());restore(redoS.pop());}
+function updateUndo(){$('#btn-undo').disabled=!undoS.length;$('#btn-redo').disabled=!redoS.length;}
+function save(){store.set('cpw2.b'+prob,{parts:S.parts,wires:S.wires,nextId:S.nextId});}
+function afterChange(){save();renderAll();renderPanel();updateUndo();}
+
+/* ---------- 렌더 ---------- */
+const svg=$('#board'),vp=$('#vp'),Lparts=$('#Lparts'),Lwires=$('#Lwires'),Lpins=$('#Lpins'),Lover=$('#Lover');
+const tmpSvg=document.createElementNS(NS,'svg');
+let lastSig={},lastLive='';
+function applyView(){vp.setAttribute('transform',`translate(${view.tx} ${view.ty}) scale(${view.s})`);}
+function partSvg(p){
+  const d=DEFS[p.type],r=rtOf(p.id),isSel=sel&&sel.t==='part'&&sel.id===p.id,inside=p.y>=0&&p.y<1050&&p.x>=0&&p.x<1000;
+  const cap=d.cap?T(d.w/2,d.h+16,p.label+(p.sub?` · ${p.sub}`:''),inside?'tc':'tcx'):'';
+  return `<g class="part" data-part="${p.id}" transform="translate(${p.x} ${p.y})">${isSel?`<rect class="selbox" x="-6" y="-6" width="${d.w+12}" height="${d.h+12}" rx="9"/>`:''}${d.draw(p,d,r)}${cap}</g>`;
+}
+function partSig(p){const r=rt[p.id];return (sel&&sel.id===p.id?'s':'')+(r?[r.coil,r.lit,r.powered,r.pressed,r.on,r.pos,r.trip,r.level,r.flsOn,r.run,r.warn,r.flip,r.done,r.ls1,r.ls2,p.type==='timer'?Math.floor(r.t*10):0].join(','):'')+(p.type==='tbp'?sim.power:'');}
+function renderParts(){Lparts.innerHTML=S.parts.map(partSvg).join('');lastSig={};for(const p of S.parts)lastSig[p.id]=partSig(p);}
+function replacePart(p){const old=Lparts.querySelector(`.part[data-part="${p.id}"]`);tmpSvg.innerHTML=partSvg(p);const nu=tmpSvg.firstElementChild;if(old)old.replaceWith(nu);else Lparts.appendChild(nu);}
+function wirePts(w){
+  const A=pinPos(w.a),B=pinPos(w.b);if(!A||!B)return null;const r=w.r||'v';
+  if(r==='s')return [A,B];
+  if(r==='v'){const m=w.m!=null?w.m:(Math.abs(A.y-B.y)>=16?snapv((A.y+B.y)/2)+3:A.y+pinSide(w.a)*24);return [A,{x:A.x,y:m},{x:B.x,y:m},B];}
+  const m=w.m!=null?w.m:snapv((A.x+B.x)/2)+3;return [A,{x:m,y:A.y},{x:m,y:B.y},B];
+}
+const K=(a,b)=>a+'\u0001'+b;
+function isLive(w){if(!sim.power||!sim.ph||!sim.uf)return false;return sim.ph.has(sim.uf.find(K(w.a.p,w.a.k)));}
+function renderWires(){
+  let s='';
+  for(const w of S.wires){
+    const pts=wirePts(w);if(!pts)continue;const d='M'+pts.map(p=>`${p.x} ${p.y}`).join('L');const c=WC[w.c]||WC.y;
+    const cls=['wire'];if(sel&&sel.t==='wire'&&sel.id===w.id)cls.push('sel');if(mode==='sim'&&isLive(w))cls.push('live');if(sim.fault&&sim.fault.wires.has(w.id))cls.push('short');
+    s+=`<g class="${cls.join(' ')}" data-wire="${w.id}"><path class="wh" d="${d}"/><path class="wo" d="${d}"/><path class="wc" d="${d}" stroke="${c.hex}"/>${c.stripe?`<path class="wc" d="${d}" stroke="${c.stripe}" stroke-dasharray="7 7" stroke-linecap="butt"/>`:''}</g>`;
+  }
+  Lwires.innerHTML=s;
+}
+function renderPins(){
+  const cnt=wireCounts();let s='';
+  for(const p of S.parts)for(const q of DEFS[p.type].pins){
+    const c=cnt[p.id+'|'+q.k]||0,cls=['pin'];if(pending&&pending.p===p.id&&pending.k===q.k)cls.push('pend');if(c>2)cls.push('over');
+    s+=`<g class="${cls.join(' ')}" data-part="${p.id}" data-pin="${esc(q.k)}" transform="translate(${p.x+q.x} ${p.y+q.y})"><circle class="ph" r="10.5"/><circle class="ps" r="6"/><path class="pslot" d="M-3.6 -3.6L3.6 3.6"/></g>`;
+  }
+  Lpins.innerHTML=s;
+}
+function renderOver(){
+  let s='';
+  if(sel&&sel.t==='wire'&&mode!=='sim'){const w=wireById(sel.id),pts=w&&wirePts(w);
+    if(pts&&pts.length===4){const x=(pts[1].x+pts[2].x)/2,y=(pts[1].y+pts[2].y)/2;s+=`<g class="handle" data-wire="${w.id}"><circle cx="${x}" cy="${y}" r="16" style="fill:transparent;stroke:none"/><circle cx="${x}" cy="${y}" r="8"/></g>`;}}
+  Lover.innerHTML=s+'<path class="rubber" id="rubber" d=""/>';
+}
+function renderAll(){renderParts();renderWires();renderPins();renderOver();$('#seldot').classList.toggle('show',!!sel);}
+let rafQ=0;function scheduleRender(){if(rafQ)return;rafQ=requestAnimationFrame(()=>{rafQ=0;renderAll();});}
+
+/* ---------- 기구 추가·삭제·배선 ---------- */
+function thumb(d){
+  const p={id:'_',type:d.type,label:d.prefix,set:d.set,x:0,y:0},r={coil:false,t:0,on:true,level:0,pos:0};
+  let s=d.draw(p,d,r);for(const q of d.pins)s+=`<circle cx="${q.x}" cy="${q.y}" r="5.5" fill="#d6d9db" stroke="#6b7276"/>`;
+  return `<svg viewBox="-6 -6 ${d.w+12} ${d.h+12}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${s}</svg>`;
+}
+function nextLabel(d){const has=new Set(S.parts.map(p=>p.label));if(!has.has(d.prefix)&&!/TB$|^PB$|^X$|^T$|^MC$/.test(d.prefix))return d.prefix;for(let n=1;;n++)if(!has.has(d.prefix+n))return d.prefix+n;}
+function viewCenter(){const r=svg.getBoundingClientRect();return {x:(r.width/2-view.tx)/view.s,y:(r.height/2-view.ty)/view.s};}
+function addPart(type){
+  if(mode==='sim')setMode('place');
+  pushUndo();const d=DEFS[type],c=viewCenter();let x=snapv(c.x-d.w/2),y=snapv(c.y-d.h/2);
+  while(S.parts.some(p=>Math.abs(p.x-x)<20&&Math.abs(p.y-y)<20)){x+=30;y+=30;}
+  const p={id:'p'+S.nextId++,type,x,y,label:nextLabel(d)};if(d.set!=null)p.set=d.set;
+  S.parts.push(p);sel={t:'part',id:p.id};afterChange();toast(`${d.name} ${p.label} 추가됨`);
+}
+function delPart(id){pushUndo();S.parts=S.parts.filter(p=>p.id!==id);S.wires=S.wires.filter(w=>w.a.p!==id&&w.b.p!==id);sel=null;afterChange();}
+function dupPart(id){const o=partById(id);if(!o)return;pushUndo();const d=DEFS[o.type];const p={...o,id:'p'+S.nextId++,x:o.x+30,y:o.y+30,label:nextLabel(d)};S.parts.push(p);sel={t:'part',id:p.id};afterChange();}
+function addWire(a,b){
+  if(samePin(a,b))return;
+  if(S.wires.some(w=>(samePin(w.a,a)&&samePin(w.b,b))||(samePin(w.a,b)&&samePin(w.b,a)))){toast('이미 연결된 단자입니다');return;}
+  pushUndo();S.wires.push({id:'w'+S.nextId++,a,b,c:wireColor});afterChange();
+  const cnt=wireCounts();if(Math.max(cnt[a.p+'|'+a.k],cnt[b.p+'|'+b.k])>2)toast('한 단자에 3가닥 이상 물렸습니다. 한 단자에는 2가닥까지만 접속합니다.','warn');
+}
+function delWire(id){pushUndo();S.wires=S.wires.filter(w=>w.id!==id);sel=null;afterChange();}
+
+/* ---------- 동작 시뮬레이션 ---------- */
+function makeUF(){const P=new Map();const f=x=>{let r=P.get(x);if(r===undefined){P.set(x,x);return x;}if(r===x)return x;r=f(r);P.set(x,r);return r;};return {find:f,union(a,b){a=f(a);b=f(b);if(a!==b)P.set(a,b);}};}
+function act(p,r){switch(p.type){case 'mc':case 'relay':return r.coil;case 'eocr':return r.trip;case 'fls':return r.flsOn;case 'mccb':return r.on;case 'pbg':case 'pbr':return r.pressed;case 'ss':return r.pos===1;case 'timer':return r.done;default:return false;}}
+function closed(p,k){const r=rtOf(p.id);switch(k){case 'cond':return true;case 'no':return act(p,r);case 'nc':return !act(p,r);case 'ino':return r.coil;case 'tno':return r.done;case 'tnc':return !r.done;
+  case 'fno':return r.coil&&r.flip;case 'fnc':return !(r.coil&&r.flip);case 'ls1':return r.ls1;case 'ls2':return r.ls2;default:return false;}}
+function simStep(dt){
+  const uf=makeUF();
+  for(const w of S.wires)uf.union(K(w.a.p,w.a.k),K(w.b.p,w.b.k));
+  for(const p of S.parts){
+    for(const [k,a,b] of elsOf(p.type))if(!LOADS.has(k)&&closed(p,k))uf.union(K(p.id,a),K(p.id,b));
+    if(p.type==='tbf'){const L=rtOf(p.id).level;if(L>=1)uf.union(K(p.id,'E2'),K(p.id,'E3'));if(L>=2)uf.union(K(p.id,'E1'),K(p.id,'E3'));}
+  }
+  const ph=new Map();
+  if(sim.power)for(const p of S.parts)if(p.type==='tbp')['L1','L2','L3','PE'].forEach((k,i)=>{const r=uf.find(K(p.id,k));if(!ph.has(r))ph.set(r,new Set());ph.get(r).add(i);});
+  for(const [root,set] of ph)if(set.size>1){fault(root,set,uf);return;}
+  sim.uf=uf;sim.ph=ph;
+  const phase=(id,k)=>{const s=ph.get(uf.find(K(id,k)));return s?s.values().next().value:-1;};
+  const isP=x=>x>=0&&x<3,coilN={};
+  for(const p of S.parts){
+    const r=rtOf(p.id);r.lit=false;r.powered=false;coilN[p.id]=false;
+    for(const [k,a,b] of elsOf(p.type)){if(!LOADS.has(k))continue;const A=phase(p.id,a),B=phase(p.id,b),on=isP(A)&&isP(B)&&A!==B;
+      if(k==='coil')coilN[p.id]=coilN[p.id]||on;else if(k==='pwr')r.powered=r.powered||on;else r.lit=r.lit||on;}
+    if(p.type==='tbm'){const u=phase(p.id,'U'),v=phase(p.id,'V'),w=phase(p.id,'W'),xs=[u,v,w].filter(isP),n=new Set(xs).size;
+      r.run=(xs.length===3&&n===3)?((v-u+3)%3===1?1:-1):0;r.warn=(!r.run&&n>=2)?'결상':'';}
+    if(p.type==='fls'){const same=(a,b)=>uf.find(K(p.id,a))===uf.find(K(p.id,b));r.sE1=same('7','1');r.sE2=same('8','1');}
+  }
+  for(const p of S.parts){
+    const r=rtOf(p.id);r.coil=coilN[p.id];
+    if(p.type==='timer'){if(r.coil){r.t+=dt;r.done=r.t>=(+p.set||0);}else{r.t=0;r.done=false;}}
+    else if(p.type==='flicker'){if(r.coil){r.t+=dt;r.flip=Math.floor(r.t/Math.max(.1,+p.set||1))%2===0;}else{r.t=0;r.flip=false;}}
+    else if(p.type==='fls'){if(!r.powered)r.flsOn=false;else if(r.sE1)r.flsOn=true;else if(!r.sE2)r.flsOn=false;}
+  }
+}
+function fault(root,set,uf){
+  const nm=['L1','L2','L3','PE'],xs=[...set].sort();
+  const ids=new Set(S.wires.filter(w=>uf.find(K(w.a.p,w.a.k))===root).map(w=>w.id));
+  sim.fault={msg:set.has(3)?`지락: ${xs.filter(i=>i<3).map(i=>nm[i]).join('·')}상이 보호도체(PE)에 바로 연결되었습니다. 빨갛게 깜박이는 전선을 확인하세요.`:`단락: ${xs.map(i=>nm[i]).join('–')}상이 부하 없이 바로 연결되었습니다. 빨갛게 깜박이는 전선을 확인하세요.`,wires:ids};
+  sim.power=false;sim.ph=new Map();
+  for(const p of S.parts){const r=rtOf(p.id);Object.assign(r,{coil:false,lit:false,powered:false,run:0,warn:'',t:0,done:false,flip:false,flsOn:false});if(p.type==='mccb')r.on=false;}
+  renderWires();
+}
+function simDown(pid,bp){
+  const p=partById(pid),r=rtOf(pid);
+  switch(p.type){
+    case 'pbg':case 'pbr':r.pressed=true;break;
+    case 'mccb':r.on=!r.on;toast(`${p.label} ${r.on?'투입 (ON)':'차단 (OFF)'}`);break;
+    case 'ss':r.pos=r.pos?0:1;toast(`${p.label} ${r.pos?'A (자동)':'M (수동)'}`);break;
+    case 'eocr':r.trip=!r.trip;toast(r.trip?`${p.label} 동작 (과전류 시험)`:`${p.label} 리셋`);break;
+    case 'tbl':{const left=bp.x-p.x<75;if(left)r.ls1=!r.ls1;else r.ls2=!r.ls2;toast(left?`LS1 ${r.ls1?'감지':'해제'}`:`LS2 ${r.ls2?'감지':'해제'}`);break;}
+    case 'tbf':{let L=r.level+r.dir;if(L>2){L=1;r.dir=-1;}else if(L<0){L=1;r.dir=1;}r.level=L;toast(`수위: ${['저수위 (E2 아래)','중간 (E2~E1)','만수위 (E1 도달)'][L]}`);break;}
+    default:return;
+  }
+  simStep(0);refreshSim();
+}
+function simUp(pid){const p=partById(pid);if(p&&(p.type==='pbg'||p.type==='pbr')){rtOf(pid).pressed=false;simStep(0);refreshSim();}}
+let lastStatus='';
+function refreshSim(){
+  for(const p of S.parts){const sg=partSig(p);if(lastSig[p.id]!==sg){lastSig[p.id]=sg;replacePart(p);}}
+  const live=S.wires.filter(isLive).map(w=>w.id).join(',')+'|'+(sim.fault?1:0);
+  if(live!==lastLive){lastLive=live;renderWires();}
+  const pb=$('#btn-power');pb.textContent=sim.power?'전원 ON':'전원 OFF';pb.classList.toggle('on',sim.power);
+  $('#fault').hidden=!sim.fault;if(sim.fault)$('#fault-msg').textContent=sim.fault.msg;
+  if(mode==='sim'){const h=statusHtml();if(h!==lastStatus){lastStatus=h;$('#side-body').innerHTML=h;}}
+}
+setInterval(()=>{if(mode==='sim'){simStep(.05);refreshSim();}},50);
+
+/* ---------- 모드 ---------- */
+function setMode(m){
+  if(mode==='sim'&&m!=='sim'){rt={};sim.power=false;sim.fault=null;sim.ph=null;}
+  if(m==='sim'){rt={};sel=null;sim.fault=null;}
+  mode=m;pending=null;
+  const app=$('#app');app.classList.toggle('sim',m==='sim');app.classList.remove('mode-place','mode-wire','mode-sim');app.classList.add('mode-'+m);
+  for(const b of document.querySelectorAll('#modes button'))b.classList.toggle('on',b.dataset.mode===m);
+  $('#wirebar').hidden=m!=='wire';$('#simbar').hidden=m!=='sim';
+  lastStatus='';lastLive='';renderAll();renderPanel();refreshSim();updateHint();
+}
+function updateHint(){
+  const h={place:'<b>배치</b> 공개문제 배치도대로 기구가 놓여 있습니다. 끌어서 옮길 수 있고, 빈 곳을 끌면 화면이 이동합니다. 두 손가락으로 확대하세요.',
+    wire:pending?`<b>${esc(pinName(pending))}</b> 선택됨. 연결할 단자를 누르세요. 같은 단자를 다시 누르면 취소됩니다.`:'<b>배선</b> 전선색을 고르고 단자 두 개를 차례로 누르세요. 끌어서 이어도 됩니다. 전선을 누르면 색과 경로를 바꿀 수 있습니다.',
+    sim:'<b>동작 시험</b> 전원을 켜고 버튼을 누르고 있으세요. MCCB·SS·EOCR(동작/리셋)·TB4(수위 또는 LS1/LS2)는 누를 때마다 바뀝니다.'}[mode];
+  $('#hint').innerHTML=h;
+}
+
+/* ---------- 포인터 ---------- */
+const ptrs=new Map();let gest=null,hovPin=null;
+function toBoard(cx,cy){const r=svg.getBoundingClientRect();return {x:(cx-r.left-view.tx)/view.s,y:(cy-r.top-view.ty)/view.s};}
+function zoomAt(sx,sy,s){s=clamp(s,.2,4);const bx=(sx-view.tx)/view.s,by=(sy-view.ty)/view.s;view.s=s;view.tx=sx-bx*s;view.ty=sy-by*s;applyView();}
+function setHov(el){if(hovPin===el)return;if(hovPin)hovPin.classList.remove('hov');hovPin=el;if(el)el.classList.add('hov');}
+function clearRubber(){const r=$('#rubber');if(r)r.setAttribute('d','');setHov(null);}
+function cancelGesture(){if(!gest)return;if(gest.t==='sim')simUp(gest.pid);if(gest.undo)afterChange();clearRubber();gest=null;}
+svg.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  try{svg.setPointerCapture(e.pointerId);}catch(_){}
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){cancelGesture();const [a,b]=[...ptrs.values()];gest={t:'pinch',d0:Math.hypot(a.x-b.x,a.y-b.y)||1,s0:view.s,m0:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},tx0:view.tx,ty0:view.ty};return;}
+  if(ptrs.size>2)return;
+  const t=e.target,pinEl=t.closest('.pin'),partEl=t.closest('.part'),wireEl=t.closest('.wire'),hEl=t.closest('.handle');
+  const bp=toBoard(e.clientX,e.clientY),base={id:e.pointerId,sx:e.clientX,sy:e.clientY,moved:false,tx0:view.tx,ty0:view.ty};
+  const pid=(pinEl||partEl)&&(pinEl||partEl).dataset.part;
+  if(hEl&&mode!=='sim'){gest={...base,t:'handle',w:wireById(hEl.dataset.wire)};return;}
+  if(mode==='sim'){if(pid){gest={...base,t:'sim',pid};simDown(pid,bp);return;}}
+  else if(mode==='wire'){
+    if(pinEl){gest={...base,t:'wire',from:{p:pinEl.dataset.part,k:pinEl.dataset.pin}};return;}
+    if(wireEl){gest={...base,t:'tapwire',wid:wireEl.dataset.wire};return;}
+    if(pid){gest={...base,t:'tappart',pid};return;}
+  } else {
+    if(pid){const p=partById(pid);gest={...base,t:'drag',p,ox:bp.x-p.x,oy:bp.y-p.y};return;}
+    if(wireEl){gest={...base,t:'tapwire',wid:wireEl.dataset.wire};return;}
+  }
+  gest={...base,t:'pan'};
+});
+svg.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(!gest)return;
+  if(gest.t==='pinch'){
+    if(ptrs.size<2)return;const [a,b]=[...ptrs.values()],r=svg.getBoundingClientRect();
+    const s=clamp(gest.s0*Math.hypot(a.x-b.x,a.y-b.y)/gest.d0,.2,4),m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    const bx=(gest.m0.x-r.left-gest.tx0)/gest.s0,by=(gest.m0.y-r.top-gest.ty0)/gest.s0;
+    view.s=s;view.tx=m.x-r.left-bx*s;view.ty=m.y-r.top-by*s;applyView();return;
+  }
+  if(e.pointerId!==gest.id)return;
+  const dx=e.clientX-gest.sx,dy=e.clientY-gest.sy;
+  if(!gest.moved&&Math.hypot(dx,dy)>6)gest.moved=true;
+  if(!gest.moved)return;
+  const bp=toBoard(e.clientX,e.clientY);
+  switch(gest.t){
+    case 'pan':case 'tappart':case 'tapwire':view.tx=gest.tx0+dx;view.ty=gest.ty0+dy;applyView();break;
+    case 'drag':if(!gest.undo){pushUndo();gest.undo=true;}gest.p.x=snapv(bp.x-gest.ox);gest.p.y=snapv(bp.y-gest.oy);sel={t:'part',id:gest.p.id};scheduleRender();break;
+    case 'handle':{if(!gest.undo){pushUndo();gest.undo=true;}const w=gest.w;if((w.r||'v')==='v')w.m=snapv(bp.y)+3;else w.m=snapv(bp.x)+3;scheduleRender();break;}
+    case 'wire':{const A=pinPos(gest.from);$('#rubber').setAttribute('d',`M${A.x} ${A.y}L${bp.x} ${bp.y}`);
+      const el=document.elementFromPoint(e.clientX,e.clientY),pe=el&&el.closest?el.closest('.pin'):null;
+      setHov(pe&&!(pe.dataset.part===gest.from.p&&pe.dataset.pin===gest.from.k)?pe:null);break;}
+  }
+});
+function onUp(e){
+  if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);
+  if(!gest)return;
+  if(gest.t==='pinch'){if(ptrs.size<2)gest=null;return;}
+  if(e.pointerId!==gest.id)return;
+  const g=gest;gest=null;
+  if(e.type==='pointercancel'){if(g.t==='sim')simUp(g.pid);if(g.undo)afterChange();clearRubber();return;}
+  switch(g.t){
+    case 'pan':if(!g.moved){sel=null;pending=null;renderAll();renderPanel();updateHint();}break;
+    case 'tappart':if(!g.moved){sel={t:'part',id:g.pid};pending=null;renderAll();renderPanel();updateHint();}break;
+    case 'tapwire':if(!g.moved){sel={t:'wire',id:g.wid};pending=null;renderAll();renderPanel();updateHint();}break;
+    case 'drag':sel={t:'part',id:g.p.id};if(g.undo)afterChange();else{renderAll();renderPanel();}break;
+    case 'handle':if(g.undo)afterChange();break;
+    case 'sim':simUp(g.pid);break;
+    case 'wire':{
+      const here=g.from,target=hovPin?{p:hovPin.dataset.part,k:hovPin.dataset.pin}:null;clearRubber();
+      if(g.moved){if(target){addWire(here,target);pending=null;}}
+      else if(pending&&!samePin(pending,here)){const a=pending;pending=null;addWire(a,here);}
+      else pending=samePin(pending,here)?null:here;
+      sel=null;renderAll();renderPanel();updateHint();break;}
+  }
+}
+svg.addEventListener('pointerup',onUp);svg.addEventListener('pointercancel',onUp);
+svg.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,view.s*Math.exp(-e.deltaY*.0015));},{passive:false});
+function fitRect(x0,y0,x1,y1){
+  const r=svg.getBoundingClientRect();if(!r.width)return;const pad=24;
+  const s=clamp(Math.min((r.width-pad*2)/(x1-x0),(r.height-pad*2)/(y1-y0)),.2,2);
+  view.s=s;view.tx=(r.width-(x1-x0)*s)/2-x0*s;view.ty=(r.height-(y1-y0)*s)/2-y0*s;applyView();
+}
+function fit(){
+  let x0=0,y0=-30,x1=1000,y1=1050;
+  for(const p of S.parts){const d=DEFS[p.type];x0=Math.min(x0,p.x);y0=Math.min(y0,p.y-20);x1=Math.max(x1,p.x+d.w);y1=Math.max(y1,p.y+d.h+24);}
+  fitRect(x0,y0,x1,y1);
+}
+let fitPanelNext=false;
+$('#z-in').onclick=()=>{const r=svg.getBoundingClientRect();zoomAt(r.width/2,r.height/2,view.s*1.25);};
+$('#z-out').onclick=()=>{const r=svg.getBoundingClientRect();zoomAt(r.width/2,r.height/2,view.s/1.25);};
+$('#z-fit').onclick=()=>{fitPanelNext=!fitPanelNext;fitPanelNext?fitRect(-10,-30,1010,1060):fit();$('#z-fit').textContent=fitPanelNext?'전체':'맞춤';};
+
+/* ---------- 결선 목록 · 정답 비교 ---------- */
+const nat=(a,b)=>a.localeCompare(b,'ko',{numeric:true});
+function wireNets(){
+  const uf=makeUF(),keys=new Set();
+  for(const w of S.wires){const a=pinName(w.a),b=pinName(w.b);uf.union(a,b);keys.add(a);keys.add(b);}
+  const g=new Map();for(const k of keys){const r=uf.find(k);if(!g.has(r))g.set(r,[]);g.get(r).push(k);}
+  return [...g.values()].map(a=>a.sort(nat)).sort((a,b)=>nat(a[0],b[0]));
+}
+/* 정답 비교용: TB5·TB6 단자대는 몇 번 단자를 썼는지 상관없이 통과시켜 기구 단자끼리의 연결만 비교 */
+function elecNets(){
+  const uf=makeUF(),keys=new Set(),tb=new Set(S.parts.filter(p=>p.type==='tb20').map(p=>p.id));
+  for(const w of S.wires){const a=K(w.a.p,w.a.k),b=K(w.b.p,w.b.k);uf.union(a,b);keys.add(a);keys.add(b);}
+  for(const p of S.parts)if(tb.has(p.id))for(let i=1;i<=20;i++)uf.union(K(p.id,''+i),K(p.id,i+"'"));
+  const g=new Map();
+  for(const k of keys){const [pid,pin]=k.split('\u0001');if(tb.has(pid))continue;const r=uf.find(k);if(!g.has(r))g.set(r,[]);g.get(r).push(`${partById(pid).label}:${pin}`);}
+  return [...g.values()].filter(a=>a.length>1).map(a=>a.sort(nat)).sort((a,b)=>nat(a[0],b[0]));
+}
+function compare(ans,cur){
+  const idx=nets=>{const m=new Map();nets.forEach((n,i)=>n.forEach(k=>m.set(k,i)));return m;};
+  const ci=idx(cur),ai=idx(ans),miss=[],extra=[];
+  const split=(net,m)=>{const g=new Map();for(const k of net){const i=m.has(k)?m.get(k):'solo:'+k;if(!g.has(i))g.set(i,k);}return [...g.values()];};
+  for(const n of ans){const r=split(n,ci);for(let i=1;i<r.length;i++)miss.push([r[0],r[i]]);}
+  for(const n of cur){const r=split(n,ai);for(let i=1;i<r.length;i++)extra.push([r[0],r[i]]);}
+  return {miss,extra};
+}
+function dupLabels(){const s=new Set(),d=new Set();for(const p of S.parts){if(s.has(p.label))d.add(p.label);s.add(p.label);}return [...d];}
+
+/* ---------- 정보 패널 ---------- */
+function statusHtml(){
+  const on=f=>S.parts.filter(f);
+  const coils=on(p=>rt[p.id]&&rt[p.id].coil),lamps=on(p=>rt[p.id]&&rt[p.id].lit),motors=on(p=>p.type==='tbm');
+  let h=`<div class="eyebrow">공개문제 ${prob} · 동작 시험</div><h2>${sim.power?'전원 투입 중':'전원 꺼짐'}</h2>`;
+  if(sim.fault)h+=`<div class="card bad">${esc(sim.fault.msg)}</div>`;
+  h+=`<h3>여자된 코일</h3><div>${coils.length?coils.map(p=>`<span class="pill">${esc(p.label)}</span>`).join(''):'<span class="pill off">없음</span>'}</div>`;
+  h+=`<h3>램프 · 부저</h3><div>${lamps.length?lamps.map(p=>`<span class="pill">${esc(p.label)}</span>`).join(''):'<span class="pill off">없음</span>'}</div>`;
+  h+=`<h3>전동기</h3><div>${motors.map(p=>{const r=rt[p.id]||{};return `<span class="pill ${r.warn?'red':r.run?'':'off'}">${esc(p.sub||p.label)} ${r.run>0?'정회전':r.run<0?'역회전':r.warn?r.warn:'정지'}</span>`;}).join('')}</div>`;
+  const tm=S.parts.filter(p=>p.type==='timer');
+  if(tm.length)h+=`<h3>타이머</h3><div>${tm.map(p=>{const r=rt[p.id]||{t:0};return `<span class="pill ${r.done?'':'off'}">${esc(p.label)} <span class="mono">${Math.min(r.t||0,p.set).toFixed(1)}/${p.set}s</span></span>`;}).join('')}</div>`;
+  const fl=S.parts.find(p=>p.type==='fls');
+  if(fl){const r=rt[fl.id]||{};h+=`<h3>플로트레스</h3><div><span class="pill ${r.flsOn?'':'off'}">${r.powered?(r.flsOn?'수위 감지 동작':'감지 해제'):'전원 없음'}</span>${r.powered&&!r.sE1&&!r.sE2?'<span class="pill off">전극 미감지</span>':''}</div>`;}
+  h+=`<div class="card small muted">전압이 걸린 전선은 주황색으로 빛납니다. 코일과 램프는 서로 다른 두 상에 연결되어야 동작합니다. 상끼리 부하 없이 이어지면 단락으로 판정합니다. 플로트레스는 FLS 7·8·1번이 TB4의 E1·E2·E3에 연결되어 있어야 수위를 감지합니다.</div>`;
+  return h;
+}
+function renderPanel(){
+  const el=$('#side-body');
+  if(mode==='sim'){lastStatus=statusHtml();el.innerHTML=lastStatus;return;}
+  let h='';
+  if(sel&&sel.t==='part'&&partById(sel.id)){
+    const p=partById(sel.id),d=DEFS[p.type],cnt=wireCounts();
+    h+=`<div class="eyebrow">${esc(d.name)}</div><h2>${esc(p.label)}${p.sub?` <span class="muted" style="font-size:15px">${esc(p.sub)}</span>`:''}</h2>`;
+    h+=`<label class="fld"><span>도면 기호</span><input id="inp-label" value="${esc(p.label)}" maxlength="12" autocomplete="off"></label>`;
+    if(p.type==='timer'||p.type==='flicker')h+=`<label class="fld"><span>${p.type==='timer'?'설정 시간 t (초)':'점멸 간격 (초)'}</span><input id="inp-set" type="number" min="0.1" step="0.5" value="${p.set}"></label>`;
+    const els=elsOf(p.type);
+    if(els.length)h+=`<h3>내부 결선</h3><table class="kv"><tr><th>요소</th><th>단자</th></tr>${els.map(([k,a,b])=>`<tr><td>${KIND[k]}</td><td class="mono">${esc(a)} – ${esc(b)}</td></tr>`).join('')}</table>`;
+    if(d.pinNames)h+=`<p class="small muted">전극 단자: ${Object.entries(d.pinNames).map(([k,v])=>`${k}번=${v}`).join(', ')}</p>`;
+    h+=`<h3>단자별 연결</h3><table class="kv"><tr><th>단자</th><th>연결된 곳</th></tr>${d.pins.map(q=>{const me={p:p.id,k:q.k},c=cnt[p.id+'|'+q.k]||0,to=S.wires.filter(w=>samePin(w.a,me)||samePin(w.b,me)).map(w=>pinName(samePin(w.a,me)?w.b:w.a));return `<tr><td class="mono ${c>2?'bad':''}">${esc(q.k)}</td><td class="mono ${c>2?'bad':''}">${to.length?esc(to.join(', ')):'<span class="muted">—</span>'}${c>2?' (3가닥 이상)':''}</td></tr>`;}).join('')}</table>`;
+    h+=`<div class="row"><button class="btn" id="b-dup">복제</button><button class="btn danger" id="b-del">삭제</button></div>`;
+    if(d.sock)h+=`<div class="row"><button class="btn ghost" id="b-pm">핀 번호 고치기</button></div>`;
+  } else if(sel&&sel.t==='wire'&&wireById(sel.id)){
+    const w=wireById(sel.id),r=w.r||'v';
+    h+=`<div class="eyebrow">전선</div><h2 class="mono" style="font-size:18px">${esc(pinName(w.a))} ↔ ${esc(pinName(w.b))}</h2>`;
+    h+=`<h3>색</h3><div class="wsw">${WIRE_COLORS.map(c=>`<button class="chip ${w.c===c.k?'on':''}" data-wc="${c.k}" style="${chipStyle(c)}" title="${c.name} · ${c.note}">${c.name}</button>`).join('')}</div>`;
+    h+=`<h3>경로</h3><div class="seg" style="display:inline-flex"><button data-route="v" class="${r==='v'?'on':''}">세로 직각</button><button data-route="h" class="${r==='h'?'on':''}">가로 직각</button><button data-route="s" class="${r==='s'?'on':''}">직선</button></div>`;
+    h+=`<p class="small muted">파란 점을 끌면 꺾이는 위치를 옮길 수 있습니다.</p>`;
+    h+=`<div class="row"><button class="btn" id="b-auto">경로 자동</button><button class="btn danger" id="b-delw">전선 삭제</button></div>`;
+  } else {
+    const cnt=wireCounts(),over=Object.values(cnt).filter(c=>c>2).length,nets=wireNets(),dl=dupLabels();
+    h+=`<div class="eyebrow">전기기능사 공개문제</div><h2>${prob}번 과제</h2>`;
+    h+=`<div class="stat"><div><b>${S.parts.length}</b><span>기구</span></div><div><b>${S.wires.length}</b><span>전선</span></div><div><b class="${over?'bad':''}">${over}</b><span>3가닥 단자</span></div></div>`;
+    if(dl.length)h+=`<p class="bad small">도면 기호가 겹칩니다: ${esc(dl.join(', '))}</p>`;
+    h+=`<h3>정답 비교</h3><p class="small muted">완성한 배선을 이 과제의 정답으로 저장해 두면, 다시 배선한 결과와 기구 단자 사이의 연결을 비교합니다. TB5·TB6에서 몇 번 단자를 거쳤는지는 따지지 않습니다.</p>`;
+    h+=`<div class="row"><button class="btn" id="b-setans">현재 배선을 정답으로</button><button class="btn primary" id="b-cmp" ${answer?'':'disabled'}>정답과 비교</button></div>`;
+    if(answer)h+=`<p class="small muted">저장된 정답: 연결 묶음 ${answer.length}개</p>`;
+    if(cmp){
+      if(!cmp.miss.length&&!cmp.extra.length)h+=`<div class="card good">정답과 연결이 모두 같습니다.</div>`;
+      else{h+=`<div class="card">`;
+        if(cmp.miss.length)h+=`<div class="bad">빠진 연결 ${cmp.miss.length}개</div><ul class="list mono">${cmp.miss.map(([a,b])=>`<li>${esc(a)} ↔ ${esc(b)}</li>`).join('')}</ul>`;
+        if(cmp.extra.length)h+=`<div class="bad" style="margin-top:8px">잘못된 연결 ${cmp.extra.length}개</div><ul class="list mono">${cmp.extra.map(([a,b])=>`<li>${esc(a)} ↔ ${esc(b)}</li>`).join('')}</ul>`;
+        h+=`</div>`;}
+    }
+    h+=`<details><summary>결선 목록 (${nets.length}개 묶음)</summary><ul class="list mono">${nets.map(n=>`<li>${esc(n.join(' · '))}</li>`).join('')||'<li class="muted">전선이 없습니다</li>'}</ul></details>`;
+    h+=`<div class="row"><button class="btn" id="b-add">기구 추가</button><button class="btn" id="b-pm2">핀 설정</button></div>`;
+    h+=`<div class="row"><button class="btn danger" id="b-relay">배치 처음대로</button></div>`;
+    h+=`<h3>배선 규칙 (공개문제)</h3><ul class="list"><li>주회로 2.5mm²: L1 갈색, L2 흑색, L3 회색</li><li>제어회로 1.5mm² 황색, 보호도체 녹색-황색</li><li>한 단자에 전선 3가닥 이상 접속 금지</li><li>제어회로 전원은 퓨즈 2차측 L1(갈)·L3(회)</li></ul>`;
+  }
+  el.innerHTML=h;bindPanel();
+}
+function chipStyle(c){return `background:${c.stripe?`repeating-linear-gradient(45deg,${c.hex} 0 6px,${c.stripe} 6px 12px)`:c.hex};color:${['k','br'].includes(c.k)?'#fff':'#111'}`;}
+function bindPanel(){
+  const p=sel&&sel.t==='part'?partById(sel.id):null,w=sel&&sel.t==='wire'?wireById(sel.id):null;
+  const lab=$('#inp-label');
+  if(lab&&p){let pushed=false;lab.oninput=()=>{if(!pushed){pushUndo();pushed=true;}p.label=lab.value.trim()||p.label;save();renderParts();};lab.onchange=()=>renderPanel();}
+  const st=$('#inp-set');if(st&&p)st.onchange=()=>{const v=parseFloat(st.value);if(v>0){pushUndo();p.set=v;afterChange();}};
+  const on=(id,f)=>{const b=$(id);if(b)b.onclick=f;};
+  on('#b-del',()=>delPart(p.id));on('#b-dup',()=>dupPart(p.id));on('#b-pm',()=>openPinmap(p.type));on('#b-pm2',()=>openPinmap());on('#b-add',openAdd);
+  on('#b-relay',()=>{pushUndo();const b=buildProblem(prob);S.parts=b.parts;S.wires=[];S.nextId=b.nextId;sel=null;afterChange();fit();toast('배치를 처음대로 되돌리고 전선을 모두 지웠습니다. 되돌리기로 취소할 수 있습니다.');});
+  on('#b-delw',()=>delWire(w.id));on('#b-auto',()=>{pushUndo();delete w.m;afterChange();});
+  for(const b of document.querySelectorAll('[data-wc]'))b.onclick=()=>{pushUndo();w.c=b.dataset.wc;wireColor=w.c;buildWirebar();afterChange();};
+  for(const b of document.querySelectorAll('[data-route]'))b.onclick=()=>{pushUndo();w.r=b.dataset.route;delete w.m;afterChange();};
+  on('#b-setans',()=>{if(!S.wires.length){toast('전선이 없습니다');return;}answer=elecNets();store.set('cpw2.a'+prob,answer);cmp=null;renderPanel();toast(`${prob}번 정답으로 저장했습니다`);});
+  on('#b-cmp',()=>{cmp=compare(answer,elecNets());renderPanel();});
+}
+
+/* ---------- 도면 창 ---------- */
+const doc=$('#doc'),docB=$('#doc-b');let docTab='c',docZ=1;
+function renderDoc(){
+  for(const b of document.querySelectorAll('#doc-tabs button'))b.classList.toggle('on',b.dataset.tab===docTab);
+  const n=String(prob).padStart(2,'0');
+  if(docTab==='o'){
+    const L=OPS[prob]||[];
+    docB.innerHTML=`<div class="doc-ops"><p class="h">공개문제 ${prob}번 · 제어회로의 동작 사항</p>${L.map(l=>/^[가-하]\)/.test(l)?`<p class="h">${esc(l)}</p>`:/^※/.test(l)?`<p class="note">${esc(l)}</p>`:`<p class="i">${esc(l)}</p>`).join('')}</div>`;
+  } else {
+    const src={c:`img/c${n}.png`,b:`img/b${n}.png`,p:`img/pin${prob<=9?'01':'10'}.png`}[docTab];
+    docB.innerHTML=`<img src="${src}" alt="공개문제 ${prob}번 ${({c:'시퀀스 회로도',b:'배관 및 기구 배치도',p:'기구의 내부 결선도'})[docTab]}" style="width:${docZ*100}%">`;
+  }
+}
+$('#doc-tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){docTab=b.dataset.tab;docZ=1;renderDoc();}});
+$('#doc-zi').onclick=()=>{docZ=Math.min(5,docZ*1.3);const i=docB.querySelector('img');if(i)i.style.width=docZ*100+'%';};
+$('#doc-zo').onclick=()=>{docZ=Math.max(1,docZ/1.3);const i=docB.querySelector('img');if(i)i.style.width=docZ*100+'%';};
+$('#doc-big').onclick=()=>{doc.classList.remove('min');doc.classList.toggle('big');$('#doc-big').textContent=doc.classList.contains('big')?'작게':'크게';};
+$('#doc-min').onclick=()=>{doc.classList.remove('big');$('#doc-big').textContent='크게';doc.classList.toggle('min');$('#doc-min').textContent=doc.classList.contains('min')?'펼치기':'접기';};
+$('#btn-doc').onclick=()=>{doc.hidden=!doc.hidden;};
+(function dragDoc(){
+  const h=$('#doc-h');let st=null;
+  h.addEventListener('pointerdown',e=>{if(e.target.closest('button')||doc.classList.contains('big'))return;const r=doc.getBoundingClientRect(),pr=$('#stage').getBoundingClientRect();st={x:e.clientX,y:e.clientY,l:r.left-pr.left,t:r.top-pr.top,pr};h.setPointerCapture(e.pointerId);});
+  h.addEventListener('pointermove',e=>{if(!st)return;const l=clamp(st.l+e.clientX-st.x,-doc.offsetWidth+80,st.pr.width-80),t=clamp(st.t+e.clientY-st.y,0,st.pr.height-44);doc.style.left=l+'px';doc.style.top=t+'px';doc.style.right='auto';});
+  const end=()=>{st=null;};h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);
+})();
+
+/* ---------- 도구줄 ---------- */
+function buildWirebar(){
+  $('#wirebar').innerHTML='<span class="lbl">전선색</span>'+WIRE_COLORS.map(c=>`<button class="chip ${wireColor===c.k?'on':''}" data-pick="${c.k}" title="${c.name} · ${c.note}" style="${chipStyle(c)}">${c.name}</button>`).join('');
+}
+$('#wirebar').addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(b){wireColor=b.dataset.pick;buildWirebar();}});
+$('#modes').addEventListener('click',e=>{const b=e.target.closest('[data-mode]');if(b)setMode(b.dataset.mode);});
+$('#btn-power').onclick=()=>{sim.power=!sim.power;if(sim.power)sim.fault=null;simStep(0);lastLive='';refreshSim();};
+$('#btn-reset').onclick=()=>{rt={};sim.power=false;sim.fault=null;sim.ph=null;lastLive='';renderAll();refreshSim();toast('동작 상태를 처음으로 되돌렸습니다');};
+$('#fault-ok').onclick=()=>{sim.fault=null;lastLive='';renderWires();refreshSim();};
+$('#btn-undo').onclick=undo;$('#btn-redo').onclick=redo;
+$('#btn-side').onclick=()=>{const a=$('#app');if(matchMedia('(max-width: 900px)').matches)a.classList.toggle('sideopen');else a.classList.toggle('noside');};
+$('#btn-file').onclick=openFile;
+const probSel=$('#prob');
+probSel.innerHTML=Array.from({length:18},(_,i)=>`<option value="${i+1}">공개문제 ${i+1}번</option>`).join('');
+probSel.onchange=()=>loadProblem(+probSel.value);
+document.addEventListener('keydown',e=>{
+  if(e.target.closest('input,textarea,select'))return;
+  const mod=e.ctrlKey||e.metaKey;
+  if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}
+  else if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
+  else if((e.key==='Delete'||e.key==='Backspace')&&sel&&mode!=='sim'){e.preventDefault();sel.t==='part'?delPart(sel.id):delWire(sel.id);}
+  else if(e.key==='Escape'){pending=null;sel=null;$('#modal').hidden=true;renderAll();renderPanel();updateHint();}
+  else if(e.key==='1')setMode('place');else if(e.key==='2')setMode('wire');else if(e.key==='3')setMode('sim');
+});
+
+/* ---------- 모달 ---------- */
+function modal(html){$('#sheet').innerHTML=`<button class="btn ghost close" id="m-x">닫기</button>`+html;$('#modal').hidden=false;$('#m-x').onclick=closeModal;}
+function closeModal(){$('#modal').hidden=true;}
+$('#modal').addEventListener('pointerdown',e=>{if(e.target.id==='modal')closeModal();});
+let toastT=0;function toast(msg,kind){const t=$('#toast');t.textContent=msg;t.className='toast show'+(kind?' '+kind:'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='toast',2400);}
+
+function openAdd(){
+  modal(`<h3>기구 추가</h3><p class="small muted">누르면 화면 가운데에 놓입니다.</p><div class="addgrid">${Object.values(DEFS).map(d=>`<button class="pitem" data-add="${d.type}">${thumb(d)}<span>${esc(d.name)}</span></button>`).join('')}</div>`);
+  for(const b of document.querySelectorAll('[data-add]'))b.onclick=()=>{closeModal();addPart(b.dataset.add);};
+}
+function exportJson(){return JSON.stringify({app:'cpw2',prob,parts:S.parts,wires:S.wires,nextId:S.nextId,answer});}
+function loadData(o){
+  if(!o||!Array.isArray(o.parts)||!Array.isArray(o.wires))throw new Error('형식');
+  if(o.prob&&o.prob!==prob){prob=o.prob;probSel.value=prob;store.set('cpw2.prob',prob);renderDoc();}
+  pushUndo();S.parts=o.parts.filter(p=>DEFS[p.type]);S.wires=o.wires;S.nextId=o.nextId||(S.parts.length+S.wires.length+1);
+  if(o.answer!==undefined){answer=o.answer;if(answer)store.set('cpw2.a'+prob,answer);}
+  sel=null;pending=null;cmp=null;if(mode==='sim')setMode('place');afterChange();fit();
+}
+function openFile(){
+  const slots=store.get('cpw2.slots',[]);
+  const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const inst=standalone?'<p class="small good">앱으로 설치되어 실행 중입니다. 인터넷 없이도 쓸 수 있습니다.</p>'
+    :installEvt?'<div class="row"><button class="btn primary" id="f-install">이 기기에 앱으로 설치</button></div>'
+    :ios?'<p class="small">Safari 아래(또는 위)의 <b>공유</b> 버튼 → <b>홈 화면에 추가</b>를 누르면 앱처럼 설치됩니다.</p>'
+    :'<p class="small">Chrome이나 삼성 인터넷 메뉴(⋮)에서 <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 누르세요.</p>';
+  modal(`<h3>파일</h3><h4>앱으로 설치</h4>${inst}<p class="small muted">각 공개문제의 배선은 이 기기에 자동 저장됩니다.</p>
+  <h4>이름 붙여 저장</h4><div class="row"><input id="f-name" placeholder="예: ${prob}번 1회차" maxlength="40"><button class="btn primary" id="f-save">저장</button></div>
+  <ul class="slots">${slots.map((s,i)=>`<li><span>${esc(s.name)} <span class="muted small">${s.prob?s.prob+'번 · ':''}${new Date(s.t).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span></span><button class="btn" data-load="${i}">열기</button><button class="btn danger" data-del="${i}">삭제</button></li>`).join('')||'<li class="muted small">저장된 배선이 없습니다</li>'}</ul>
+  <h4>다른 기기로 옮기기</h4><p class="small muted">아래 내용을 복사해서 다른 태블릿의 가져오기 칸에 붙여 넣으세요. 과제 번호와 정답도 함께 옮겨집니다.</p>
+  <textarea id="f-json" readonly>${esc(exportJson())}</textarea><div class="row"><button class="btn" id="f-copy">복사</button></div>
+  <textarea id="f-in" placeholder="복사한 배선 내용을 여기에 붙여 넣으세요"></textarea><div class="row"><button class="btn" id="f-import">가져오기</button></div>`);
+  const fi=$('#f-install');if(fi)fi.onclick=async()=>{const ev=installEvt;installEvt=null;ev.prompt();const r=await ev.userChoice;closeModal();toast(r.outcome==='accepted'?'설치했습니다. 홈 화면에서 실행하세요.':'설치를 취소했습니다');};
+  $('#f-save').onclick=()=>{const n=$('#f-name').value.trim()||(`${prob}번 `+(slots.length+1));const i=slots.findIndex(s=>s.name===n);const it={name:n,prob,t:Date.now(),data:{prob,parts:S.parts,wires:S.wires,nextId:S.nextId}};if(i>=0)slots[i]=it;else slots.unshift(it);store.set('cpw2.slots',slots);toast(`'${n}' 저장됨`);openFile();};
+  for(const b of document.querySelectorAll('[data-load]'))b.onclick=()=>{const s=slots[+b.dataset.load];loadData(s.data);closeModal();toast(`'${s.name}' 열림`);};
+  for(const b of document.querySelectorAll('[data-del]'))b.onclick=()=>{slots.splice(+b.dataset.del,1);store.set('cpw2.slots',slots);openFile();};
+  $('#f-copy').onclick=()=>{const ta=$('#f-json');const done=()=>toast('복사했습니다');const fb=()=>{ta.focus();ta.select();toast('선택된 내용을 길게 눌러 복사하세요');};
+    try{navigator.clipboard.writeText(ta.value).then(done,fb);}catch(_){fb();}};
+  $('#f-import').onclick=()=>{try{loadData(JSON.parse($('#f-in').value));closeModal();toast('배선을 가져왔습니다');}catch(_){toast('내용을 읽지 못했습니다. 복사한 내용 전체를 붙여 넣었는지 확인하세요.','warn');}};
+}
+function openPinmap(type){
+  const types=Object.values(DEFS).filter(d=>d.sock);let cur=type&&DEFS[type].sock?type:types[0].type;let rows;
+  const kinds=Object.keys(KIND).filter(k=>!['lamp','buzzer','ls1','ls2'].includes(k));
+  const load=()=>{rows=JSON.parse(JSON.stringify(elsOf(cur)));};
+  const draw=()=>{
+    const pins=DEFS[cur].pins.map(q=>q.k).sort((a,b)=>a-b),opt=(v,list,lab)=>list.map(x=>`<option value="${x}" ${x===v?'selected':''}>${lab?lab(x):x}</option>`).join('');
+    modal(`<h3>기구 핀 설정</h3><p class="small muted">기본값은 공개문제 '5) 기구의 내부 결선도'를 따릅니다. 실습실 기구가 다르면 여기서 고치세요. 모든 과제에 적용됩니다.</p>
+    <label class="fld"><span>기구</span><select id="pm-type">${types.map(d=>`<option value="${d.type}" ${d.type===cur?'selected':''}>${d.name}</option>`).join('')}</select></label>
+    <table class="kv pmtab"><tr><th>요소</th><th>단자</th><th>단자</th><th></th></tr>${rows.map((r,i)=>`<tr><td><select data-i="${i}" data-f="0">${opt(r[0],kinds,k=>KIND[k])}</select></td><td><select data-i="${i}" data-f="1">${opt(r[1],pins)}</select></td><td><select data-i="${i}" data-f="2">${opt(r[2],pins)}</select></td><td><button class="btn danger" data-rm="${i}" aria-label="삭제">×</button></td></tr>`).join('')}</table>
+    <div class="row"><button class="btn" id="pm-add">요소 추가</button><button class="btn" id="pm-reset">기본값으로</button><button class="btn primary" id="pm-save">저장</button></div>
+    ${PINMAP[cur]?'<p class="small muted">이 기구는 기본값에서 바뀐 설정을 쓰고 있습니다.</p>':''}`);
+    $('#pm-type').onchange=e=>{cur=e.target.value;load();draw();};
+    for(const s of document.querySelectorAll('.pmtab select'))s.onchange=()=>{rows[+s.dataset.i][+s.dataset.f]=s.value;};
+    for(const b of document.querySelectorAll('[data-rm]'))b.onclick=()=>{rows.splice(+b.dataset.rm,1);draw();};
+    $('#pm-add').onclick=()=>{rows.push(['no',pins[0],pins[1]]);draw();};
+    $('#pm-reset').onclick=()=>{delete PINMAP[cur];store.set('cpw2.pinmap',PINMAP);load();draw();renderAll();renderPanel();toast('기본값으로 되돌렸습니다');};
+    $('#pm-save').onclick=()=>{PINMAP[cur]=rows;store.set('cpw2.pinmap',PINMAP);renderAll();renderPanel();closeModal();toast(`${DEFS[cur].name} 핀 설정을 저장했습니다`);};
+  };
+  load();draw();
+}
+
+/* ---------- 과제 불러오기 ---------- */
+function loadProblem(n){
+  if(mode==='sim')setMode('place');
+  prob=n;probSel.value=n;store.set('cpw2.prob',n);
+  const saved=store.get('cpw2.b'+n,null);
+  if(saved&&Array.isArray(saved.parts)&&saved.parts.length){S.parts=saved.parts.filter(p=>DEFS[p.type]);S.wires=saved.wires||[];S.nextId=saved.nextId||1;}
+  else{const b=buildProblem(n);S.parts=b.parts;S.wires=b.wires;S.nextId=b.nextId;}
+  answer=store.get('cpw2.a'+n,null);cmp=null;sel=null;pending=null;undoS.length=0;redoS.length=0;
+  renderAll();renderPanel();updateUndo();renderDoc();updateHint();requestAnimationFrame(fit);
+}
+/* ---------- PWA ---------- */
+let installEvt=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;});
+addEventListener('appinstalled',()=>{installEvt=null;toast('앱이 설치되었습니다');});
+if('serviceWorker' in navigator&&location.protocol!=='file:'){
+  addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').then(reg=>{
+    reg.addEventListener('updatefound',()=>{const w=reg.installing;w&&w.addEventListener('statechange',()=>{if(w.state==='activated'&&navigator.serviceWorker.controller)toast('새 버전이 준비되었습니다. 앱을 다시 열면 적용됩니다.');});});
+  }).catch(()=>{});});
+}
+(function init(){
+  if(innerWidth<1200&&innerWidth>900)$('#app').classList.add('noside');
+  buildWirebar();setMode('place');loadProblem(prob);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>renderAll());
+  addEventListener('resize',()=>{});
+})();
+</script>
+</body>
+</html>
