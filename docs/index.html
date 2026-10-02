@@ -110,6 +110,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .docimg svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .docimg .hl{fill:none;stroke:#b6ff00;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;opacity:.62;mix-blend-mode:multiply}
 .docimg .hlt{fill:#7ad400;opacity:.8}
+.docimg{container-type:inline-size}
+.notes{position:absolute;inset:0;pointer-events:none}
+.note{position:absolute;transform:translate(-50%,-50%);font:700 max(12px,1.05cqw)/1.1 system-ui,sans-serif;color:#d0021b;background:rgba(255,255,255,.82);border:1px solid rgba(208,2,27,.35);padding:.05em .25em;border-radius:3px;white-space:nowrap}
+.note-in{position:absolute;transform:translate(-50%,-50%);width:5em;font:700 16px system-ui,sans-serif;text-align:center;color:#d0021b;border:2px solid #d0021b;border-radius:4px;padding:2px;z-index:3}
+.doc-b.pen{cursor:crosshair}
+#doc-pen.on{background:#ffd9de;border-color:#d0021b;color:#1b2220}
 #doc-hl.on{background:#d9ff66;border-color:#9ccc00;color:#1b2220}
 .doc-ops{padding:12px 16px 20px;color:#1b2220;font-size:14px;line-height:1.6;max-width:70ch;-webkit-user-select:text;user-select:text}
 .doc-ops p{margin:0 0 6px}
@@ -232,7 +238,7 @@ svg text{pointer-events:none}
   <header class="top">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#2a2d30"/><circle cx="9" cy="9" r="3" fill="#d6d9db"/><circle cx="21" cy="21" r="3" fill="#d6d9db"/><path d="M9 9V15H21V21" stroke="#e8c21c" stroke-width="2.4" fill="none"/></svg>
-      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v7</small></div>
+      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v8</small></div>
     </div>
     <select class="prob" id="prob" aria-label="공개문제 선택"></select>
     <div class="seg" id="modes">
@@ -275,6 +281,8 @@ svg text{pointer-events:none}
           <button data-tab="c" class="on">회로도</button><button data-tab="o">동작 사항</button><button data-tab="p">핀 결선도</button><button data-tab="b">배관도</button>
         </div>
         <div class="spacer"></div>
+        <button class="btn sm" id="doc-pen" title="켠 뒤 도면을 누르면 그 자리에 핀 번호를 적습니다">핀번호</button>
+        <button class="btn sm" id="doc-pclr" hidden>다 지움</button>
         <button class="btn sm" id="doc-hl" title="바르게 이은 곳을 회로도에 형광색으로 표시">형광</button>
         <button class="btn sm" id="doc-zo" aria-label="도면 축소">−</button>
         <button class="btn sm" id="doc-zi" aria-label="도면 확대">+</button>
@@ -1400,8 +1408,8 @@ function renderDoc(){
     docB.innerHTML=`<div class="doc-ops"><p class="h">공개문제 ${prob}번 · 제어회로의 동작 사항</p>${L.map(l=>/^[가-하]\)/.test(l)?`<p class="h">${esc(l)}</p>`:/^※/.test(l)?`<p class="note">${esc(l)}</p>`:`<p class="i">${esc(l)}</p>`).join('')}</div>`;
   } else {
     const src={c:`img/c${n}.png`,b:`img/b${n}.png`,p:`img/pin${prob<=9?'01':'10'}.png`}[docTab];
-    docB.innerHTML=`<div class="docimg" style="width:${docZ*100}%"><img src="${src}" alt="공개문제 ${prob}번 ${({c:'시퀀스 회로도',b:'배관 및 기구 배치도',p:'기구의 내부 결선도'})[docTab]}">${docTab==='c'?'<svg id="hlsvg" viewBox="0 0 1892 788" preserveAspectRatio="none"></svg>':''}</div>`;
-    renderHL();
+    docB.innerHTML=`<div class="docimg" style="width:${docZ*100}%"><img src="${src}" alt="공개문제 ${prob}번 ${({c:'시퀀스 회로도',b:'배관 및 기구 배치도',p:'기구의 내부 결선도'})[docTab]}">${docTab==='c'?'<svg id="hlsvg" viewBox="0 0 1892 788" preserveAspectRatio="none"></svg>':''}<div class="notes" id="notes"></div></div>`;
+    renderHL();renderNotes();
   }
 }
 /* ---------- 회로도 형광 표시 ----------
@@ -1452,6 +1460,35 @@ function setDocZ(z,px=docB.clientWidth/2,py=docB.clientHeight/2){
 }
 $('#doc-zi').onclick=()=>setDocZ(docZ*1.3);
 $('#doc-zo').onclick=()=>setDocZ(docZ/1.3);
+/* ---------- 도면에 핀번호 적기 ----------
+   cpw2.notes = {그림 이름(c01, b01, pin01..): [{x,y,t}]}. x·y는 그림 너비·높이에 대한 비율이라 확대해도 제자리에 붙는다 */
+let NOTES=store.get('cpw2.notes',{}),penOn=false;
+const noteKey=()=>{const i=docB.querySelector('.docimg img');return i?i.getAttribute('src').replace(/^img\/|\.png$/g,''):null;};
+function renderNotes(){
+  const L=$('#notes'),k=noteKey();if(!L||!k)return;
+  L.innerHTML=(NOTES[k]||[]).map((n,i)=>`<span class="note" data-i="${i}" style="left:${n.x*100}%;top:${n.y*100}%">${esc(n.t)}</span>`).join('');
+}
+function noteAt(cx,cy){
+  const box=docB.querySelector('.docimg'),k=noteKey();if(!box||!k)return;
+  const open=box.querySelector('.note-in');if(open){open.blur();return;}/* 적던 칸이 있으면 먼저 마무리만 */
+  const r=box.getBoundingClientRect(),list=NOTES[k]||(NOTES[k]=[]);
+  let i=[...box.querySelectorAll('.note')].findIndex(el=>{const b=el.getBoundingClientRect();return cx>=b.left-8&&cx<=b.right+8&&cy>=b.top-8&&cy<=b.bottom+8;});
+  const n=i>=0?list[i]:{x:(cx-r.left)/r.width,y:(cy-r.top)/r.height,t:''};
+  if(i>=0)box.querySelector(`.note[data-i="${i}"]`).hidden=true;
+  const inp=document.createElement('input');
+  Object.assign(inp,{className:'note-in',value:n.t,maxLength:8,inputMode:'numeric',autocomplete:'off'});
+  inp.style.left=n.x*100+'%';inp.style.top=n.y*100+'%';
+  let done=false;
+  const commit=()=>{if(done)return;done=true;const t=inp.value.trim();
+    if(i>=0){if(t)list[i].t=t;else list.splice(i,1);}else if(t)list.push({...n,t});
+    if(!list.length)delete NOTES[k];store.set('cpw2.notes',NOTES);inp.remove();renderNotes();};
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();else if(e.key==='Escape'){inp.value=n.t;inp.blur();}});
+  box.appendChild(inp);inp.focus({preventScroll:true});inp.select();
+}
+function setPen(on){penOn=on;$('#doc-pen').classList.toggle('on',on);$('#doc-pclr').hidden=!on;docB.classList.toggle('pen',on);}
+$('#doc-pen').onclick=()=>{setPen(!penOn);if(penOn)toast('도면을 누르면 핀 번호를 적습니다. 적은 번호를 누르면 고치고, 비우면 지워집니다');};
+$('#doc-pclr').onclick=()=>{const k=noteKey();if(!k||!NOTES[k])return;if(!confirm('이 도면에 적은 핀 번호를 모두 지울까요?'))return;delete NOTES[k];store.set('cpw2.notes',NOTES);renderNotes();};
 /* 도면 칸: 한 손가락(또는 마우스)으로 끌어 이동, 두 손가락으로 벌리고 오므려 확대·축소, 마우스 휠로 확대·축소 */
 (function panZoomDoc(){
   const ptrs=new Map();let g=null;
@@ -1462,13 +1499,17 @@ $('#doc-zo').onclick=()=>setDocZ(docZ/1.3);
       g={t:'pinch',d0:Math.hypot(a.x-b.x,a.y-b.y)||1,z0:docZ,ax:(docB.scrollLeft+m.x)/docZ,ay:(docB.scrollTop+m.y)/docZ};}
     else g=null;
     docB.classList.toggle('drag',!!g);};
-  docB.addEventListener('pointerdown',e=>{if(e.button>0)return;ptrs.set(e.pointerId,loc(e));docB.setPointerCapture(e.pointerId);start();});
-  docB.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,loc(e));if(!g)return;
+  let tap=null;/* 거의 움직이지 않고 뗀 한 손가락 = 누름 → 핀번호 적기 */
+  docB.addEventListener('pointerdown',e=>{if(e.button>0||e.target.closest('input'))return;ptrs.set(e.pointerId,loc(e));docB.setPointerCapture(e.pointerId);
+    tap=ptrs.size===1?{x:e.clientX,y:e.clientY}:null;start();});
+  docB.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,loc(e));
+    if(tap&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>8)tap=null;if(!g)return;
     if(g.t==='pan'){const p=ptrs.values().next().value;docB.scrollLeft=g.sl-(p.x-g.x);docB.scrollTop=g.st-(p.y-g.y);return;}
     const [a,b]=[...ptrs.values()],m={x:(a.x+b.x)/2,y:(a.y+b.y)/2},i=docB.querySelector('.docimg');if(!i)return;
     docZ=clamp(g.z0*Math.hypot(a.x-b.x,a.y-b.y)/g.d0,1,6);i.style.width=docZ*100+'%';
     docB.scrollLeft=g.ax*docZ-m.x;docB.scrollTop=g.ay*docZ-m.y;});
-  const end=e=>{if(!ptrs.delete(e.pointerId))return;start();};
+  const end=e=>{if(!ptrs.delete(e.pointerId))return;start();
+    if(e.type==='pointerup'&&tap&&!ptrs.size&&penOn)noteAt(e.clientX,e.clientY);if(!ptrs.size)tap=null;};
   docB.addEventListener('pointerup',end);docB.addEventListener('pointercancel',end);
   docB.addEventListener('wheel',e=>{if(!docB.querySelector('.docimg'))return;e.preventDefault();const p=loc(e);setDocZ(docZ*Math.exp(-e.deltaY*.0015),p.x,p.y);},{passive:false});
 })();
