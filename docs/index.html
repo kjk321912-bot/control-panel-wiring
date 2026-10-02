@@ -92,13 +92,24 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
 /* 도면 창 */
 .doc{position:absolute;right:12px;top:12px;width:min(520px,46%);height:min(330px,44%);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.22);display:flex;flex-direction:column;z-index:5;overflow:hidden}
-.doc.big{left:12px!important;top:12px!important;right:12px;bottom:12px;width:auto;height:auto}
-.doc.min{height:auto}
+.doc.big{left:12px!important;top:12px!important;right:12px!important;bottom:12px;width:auto!important;height:auto!important}
+.doc.min{height:auto!important}
 .doc.min .doc-b{display:none}
+.doc-rs{position:absolute;bottom:0;width:30px;height:30px;touch-action:none;z-index:2}
+.doc-rs.r{right:0;cursor:nwse-resize}.doc-rs.l{left:0;cursor:nesw-resize}
+.doc-rs::after{content:"";position:absolute;bottom:5px;width:12px;height:12px;border-bottom:3px solid #8d9398;opacity:.9}
+.doc-rs.r::after{right:5px;border-right:3px solid #8d9398;border-bottom-right-radius:3px}
+.doc-rs.l::after{left:5px;border-left:3px solid #8d9398;border-bottom-left-radius:3px}
+.doc.big .doc-rs,.doc.min .doc-rs{display:none}
 .doc-h{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);cursor:move;touch-action:none;flex-wrap:wrap}
 .doc-h .seg button{min-height:32px;padding:0 10px;font-size:12.5px}
 .doc-b{flex:1;overflow:auto;background:#fff;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
 .doc-b img{display:block;width:100%;height:auto;max-width:none}
+.docimg{position:relative;max-width:none}
+.docimg svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.docimg .hl{fill:none;stroke:#b6ff00;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;opacity:.62;mix-blend-mode:multiply}
+.docimg .hlt{fill:#7ad400;opacity:.8}
+#doc-hl.on{background:#d9ff66;border-color:#9ccc00;color:#1b2220}
 .doc-ops{padding:12px 16px 20px;color:#1b2220;font-size:14px;line-height:1.6;max-width:70ch;-webkit-user-select:text;user-select:text}
 .doc-ops p{margin:0 0 6px}
 .doc-ops .h{font-weight:700;margin-top:12px}
@@ -184,6 +195,7 @@ svg text{pointer-events:none}
 .pin.hov .ph,.pin.pend .ph{fill:var(--accent);opacity:.35}
 .pin.pend .ps{fill:#ffd23f}
 .pin.over .ph{fill:#e0281e;opacity:.4}
+.mode-wire .pin.full .ps{fill:#8d9398;stroke:#5b6064}
 .wire .wh{fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke}
 .wire .wo{fill:none;stroke:rgba(0,0,0,.45);stroke-width:5.2;stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
 .wire .wc{fill:none;stroke-width:3.2;stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
@@ -219,7 +231,7 @@ svg text{pointer-events:none}
   <header class="top">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#2a2d30"/><circle cx="9" cy="9" r="3" fill="#d6d9db"/><circle cx="21" cy="21" r="3" fill="#d6d9db"/><path d="M9 9V15H21V21" stroke="#e8c21c" stroke-width="2.4" fill="none"/></svg>
-      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v5</small></div>
+      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v6</small></div>
     </div>
     <select class="prob" id="prob" aria-label="공개문제 선택"></select>
     <div class="seg" id="modes">
@@ -262,12 +274,14 @@ svg text{pointer-events:none}
           <button data-tab="c" class="on">회로도</button><button data-tab="o">동작 사항</button><button data-tab="p">핀 결선도</button><button data-tab="b">배관도</button>
         </div>
         <div class="spacer"></div>
+        <button class="btn sm" id="doc-hl" title="바르게 이은 곳을 회로도에 형광색으로 표시">형광</button>
         <button class="btn sm" id="doc-zo" aria-label="도면 축소">−</button>
         <button class="btn sm" id="doc-zi" aria-label="도면 확대">+</button>
         <button class="btn sm" id="doc-big">크게</button>
         <button class="btn sm" id="doc-min">접기</button>
       </div>
       <div class="doc-b" id="doc-b"></div>
+      <div class="doc-rs l" data-rs="l" title="끌어서 크기 조절"></div><div class="doc-rs r" data-rs="r" title="끌어서 크기 조절"></div>
     </section>
     <div class="fault" id="fault" hidden><p id="fault-msg"></p><button class="btn" id="fault-ok">확인</button></div>
     <div class="hint" id="hint"></div>
@@ -480,7 +494,7 @@ function undo(){if(!undoS.length)return;redoS.push(snapshot());restore(undoS.pop
 function redo(){if(!redoS.length)return;undoS.push(snapshot());restore(redoS.pop());}
 function updateUndo(){$('#btn-undo').disabled=!undoS.length;$('#btn-redo').disabled=!redoS.length;}
 function save(){store.set('cpw2.b'+prob,{parts:S.parts,wires:S.wires,nextId:S.nextId});}
-function afterChange(){save();renderAll();renderPanel();updateUndo();}
+function afterChange(){save();renderAll();renderPanel();updateUndo();if(typeof renderHL==='function')renderHL();}
 
 /* ---------- 렌더 ---------- */
 const svg=$('#board'),vp=$('#vp'),Lparts=$('#Lparts'),Lwires=$('#Lwires'),Lpins=$('#Lpins'),Lover=$('#Lover');
@@ -574,7 +588,7 @@ function renderWires(){
 function renderPins(){
   const cnt=wireCounts();let s='';
   for(const p of S.parts)for(const q of DEFS[p.type].pins){
-    const c=cnt[p.id+'|'+q.k]||0,cls=['pin'];if(pending&&pending.p===p.id&&pending.k===q.k)cls.push('pend');if(c>2)cls.push('over');
+    const c=cnt[p.id+'|'+q.k]||0,cls=['pin'];if(pending&&pending.p===p.id&&pending.k===q.k)cls.push('pend');if(c>MAXW)cls.push('over');else if(c===MAXW)cls.push('full');
     s+=`<g class="${cls.join(' ')}" data-part="${p.id}" data-pin="${esc(q.k)}" transform="translate(${p.x+q.x} ${p.y+q.y})"><circle class="ph" r="10.5"/><circle class="ps" r="6"/><path class="pslot" d="M-3.6 -3.6L3.6 3.6"/></g>`;
   }
   Lpins.innerHTML=s;
@@ -602,12 +616,16 @@ function addPart(type){
 }
 function delPart(id){pushUndo();S.parts=S.parts.filter(p=>p.id!==id);S.wires=S.wires.filter(w=>w.a.p!==id&&w.b.p!==id);sel=null;afterChange();}
 function dupPart(id){const o=partById(id);if(!o)return;pushUndo();const d=DEFS[o.type];const p={...o,id:'p'+S.nextId++,x:o.x+30,y:o.y+30,label:nextLabel(d)};S.parts.push(p);sel={t:'part',id:p.id};afterChange();}
+/* 공개문제 규칙: 한 단자에는 전선 2가닥까지만 접속한다 */
+const MAXW=2;
+function pinFull(e,cnt){cnt=cnt||wireCounts();return (cnt[e.p+'|'+e.k]||0)>=MAXW;}
+function fullMsg(e){toast(`${pinName(e)} 단자에는 이미 전선이 2가닥 물려 있습니다. 한 단자에는 2가닥까지만 접속합니다.`,'warn');}
 function addWire(a,b,pts){
   if(samePin(a,b))return;
+  {const cnt=wireCounts();if(pinFull(a,cnt)){fullMsg(a);return;}if(pinFull(b,cnt)){fullMsg(b);return;}}
   if(S.wires.some(w=>(samePin(w.a,a)&&samePin(w.b,b))||(samePin(w.a,b)&&samePin(w.b,a)))){toast('이미 연결된 단자입니다');return;}
   pushUndo();if(!pts)pts=routeWire(a,b,buildGrid());S.wires.push({id:'w'+S.nextId++,a,b,c:wireColor,pts:pts||undefined});afterChange();
   if(!pts)toast('기구를 피해 가는 길을 찾지 못해 직선으로 이었습니다. 기구 사이 간격을 넓혀 보세요.','warn');
-  const cnt=wireCounts();if(Math.max(cnt[a.p+'|'+a.k],cnt[b.p+'|'+b.k])>2)toast('한 단자에 3가닥 이상 물렸습니다. 한 단자에는 2가닥까지만 접속합니다.','warn');
 }
 function delWire(id){pushUndo();S.wires=S.wires.filter(w=>w.id!==id);sel=null;afterChange();}
 
@@ -640,7 +658,7 @@ function simStep(dt){
   for(const p of S.parts){
     const r=rtOf(p.id);r.coil=coilN[p.id];
     if(p.type==='timer'){if(r.coil){r.t+=dt;r.done=r.t>=(+p.set||0);}else{r.t=0;r.done=false;}}
-    else if(p.type==='flicker'){if(r.coil){r.t+=dt;r.flip=Math.floor(r.t/Math.max(.1,+p.set||1))%2===0;}else{r.t=0;r.flip=false;}}
+    else if(p.type==='flicker'){if(r.coil){r.t+=dt;r.flip=Math.floor(r.t/Math.max(.1,+p.set||1))%2===1;}else{r.t=0;r.flip=false;}}
     else if(p.type==='fls'){if(!r.powered)r.flsOn=false;else if(r.sE1)r.flsOn=true;else if(!r.sE2)r.flsOn=false;}
   }
 }
@@ -712,7 +730,7 @@ svg.addEventListener('pointerdown',e=>{
   const pid=(pinEl||partEl)&&(pinEl||partEl).dataset.part;
   if(mode==='sim'){if(pid){gest={...base,t:'sim',pid};simDown(pid,bp);return;}}
   else if(mode==='wire'){
-    if(pinEl){gest={...base,t:'wire',from:{p:pinEl.dataset.part,k:pinEl.dataset.pin}};return;}
+    if(pinEl){const from={p:pinEl.dataset.part,k:pinEl.dataset.pin};if(pinFull(from)&&!samePin(pending,from)){fullMsg(from);return;}gest={...base,t:'wire',from};return;}
     if(wireEl){gest={...base,t:'tapwire',wid:wireEl.dataset.wire};return;}
     if(pid){gest={...base,t:'tappart',pid};return;}
   } else {
@@ -743,7 +761,7 @@ svg.addEventListener('pointermove',e=>{
       if(!gest.g){gest.g=buildGrid();gest.A=exitOf(gest.from);gest.cells=[{x:gest.A.cx,y:gest.A.cy}];}
       walk(gest,Math.round(bp.x/G),Math.round(bp.y/G));
       const el=document.elementFromPoint(e.clientX,e.clientY),pe=el&&el.closest?el.closest('.pin'):null;
-      setHov(pe&&!(pe.dataset.part===gest.from.p&&pe.dataset.pin===gest.from.k)?pe:null);
+      setHov(pe&&!(pe.dataset.part===gest.from.p&&pe.dataset.pin===gest.from.k)&&!pinFull({p:pe.dataset.part,k:pe.dataset.pin})?pe:null);
       drawPreview(gest,bp);break;}
   }
 });
@@ -833,6 +851,7 @@ function elecNets(){
   const uf=makeUF(),keys=new Set(),tb=new Set(S.parts.filter(p=>p.type==='tb20').map(p=>p.id));
   for(const w of S.wires){const a=K(w.a.p,w.a.k),b=K(w.b.p,w.b.k);uf.union(a,b);keys.add(a);keys.add(b);}
   for(const p of S.parts)if(tb.has(p.id))for(let i=1;i<=20;i++)uf.union(K(p.id,''+i),K(p.id,i+"'"));
+  for(const p of S.parts)for(const [x,y] of LINKED[p.type]||[])uf.union(K(p.id,x),K(p.id,y));
   const g=new Map();
   for(const k of keys){const [pid,pin]=k.split('\u0001');if(tb.has(pid))continue;const r=uf.find(k);if(!g.has(r))g.set(r,[]);g.get(r).push(`${partById(pid).label}:${pin}`);}
   return [...g.values()].filter(a=>a.length>1).map(a=>a.sort(nat)).sort((a,b)=>nat(a[0],b[0]));
@@ -844,6 +863,450 @@ function compare(ans,cur){
   for(const n of ans){const r=split(n,ci);for(let i=1;i<r.length;i++)miss.push([r[0],r[i]]);}
   for(const n of cur){const r=split(n,ai);for(let i=1;i<r.length;i++)extra.push([r[0],r[i]]);}
   return {miss,extra};
+}
+/* ---------- 기본 정답 (공개문제 7) 시퀀스 회로도) ----------
+   한 줄이 회로도의 한 점(전선으로 이어지는 묶음)이다.  이름: 그 점에 닿는 것들
+   - 'TB1:L1'처럼 기호:단자 → 단자가 정해진 곳 (주회로, 단자대)
+   - 'X.a'처럼 기호.종류 → 그 기구의 접점·코일 하나. 같은 것이 두 줄에 나오면 그 두 점 사이에 들어간다.
+     같은 기구의 같은 종류를 둘 쓰면 #1, #2로 구분한다.
+     종류: a·b 접점, c 코일, l 램프, bz 부저, f 퓨즈, pwr 조작 전원, ia 순시 a, ta·tb 한시 a·b, fa·fb 플리커 a·b, ls1·ls2 리밋스위치
+   - 접점의 단자 번호(릴레이 a접점 1-3 또는 8-6 등)와 방향은 정하지 않는다. 비교할 때 수험자가 쓴 단자에 맞춘다.
+   - '= 가 나': 두 점은 이어져야 하지만 전선 색이 다르다 (FLS E3는 보조회로 전선, 접지는 보호도체 전선.
+     공개문제 NOTE: FLS의 보호도체(접지) 결선은 제어판(TB6 또는 FLS 소켓)에서 보호도체 회로 전선으로 실시)
+   - '~ 가 나': 두 점은 이어도 되고 잇지 않아도 된다 */
+const ANS_MAIN=`L1: TB1:L1 MCCB:1
+L2: TB1:L2 MCCB:3
+L3: TB1:L3 MCCB:5
+R: MCCB:2 EOCR:1 F.f#1
+S: MCCB:4 EOCR:2
+T: MCCB:6 EOCR:3 F.f#2
+c1: F.f#1
+N: F.f#2
+U: EOCR:7 MC1:1 MC2:1
+V: EOCR:8 MC1:2 MC2:2
+W: EOCR:9 MC1:3 MC2:3
+U1: MC1:7 TB2:U
+V1: MC1:8 TB2:V
+W1: MC1:9 TB2:W
+U2: MC2:7 TB3:U
+V2: MC2:8 TB3:V
+W2: MC2:9 TB3:W
+PE: TB1:PE TB2:PE TB3:PE`;
+const ANS_FLS=`E1: FLS:7 TB4:E1
+E2: FLS:8 TB4:E2
+E3: FLS:1 TB4:E3
+= E3 PE`;
+const ANS={
+1:`c1: EOCR.b EOCR.a EOCR.pwr
+bus: EOCR.b SS.a SS.b X.a#1 MC1.a MC2.a
+e: EOCR.a FR.c FR.fa FR.fb
+y: FR.fa YL.l
+z: FR.fb BZ.bz
+A: SS.a FLS.pwr FLS.a
+x: FLS.a X.c
+m: SS.b PB0.b
+p: PB0.b PB1.a T.ia
+q: PB1.a T.ia X.a#1 MC1.c X.b T.ta
+t: X.b T.c
+m2: T.ta MC2.c
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr FR.c YL.l BZ.bz FLS.pwr X.c T.c MC1.c MC2.c RL.l GL.l`,
+2:`c1: EOCR.b EOCR.a EOCR.pwr
+bus: EOCR.b SS.a SS.b X.a#1 MC1.a MC2.a
+e: EOCR.a YL.l BZ.bz
+A: SS.a FLS.pwr FLS.a
+m: SS.b PB0.b
+p: PB0.b PB1.a X.a#2
+q: FLS.a PB1.a X.a#2 X.c T.c
+f: X.a#1 T.ta
+g: T.ta FR.c FR.fb FR.fa
+m1: FR.fb MC1.c
+m2: FR.fa MC2.c
+r: MC1.a RL.l
+gl: MC2.a GL.l
+N: EOCR.pwr YL.l BZ.bz FLS.pwr X.c T.c FR.c MC1.c MC2.c RL.l GL.l`,
+3:`c1: EOCR.b EOCR.a EOCR.pwr
+bus: EOCR.b X.a SS.a SS.b MC1.a MC2.a
+e: EOCR.a YL.l BZ.bz
+A: SS.a FLS.a FLS.pwr
+k: X.a FLS.a FR.c FR.fb FR.fa
+m1: FR.fb MC1.c
+m2: FR.fa MC2.c
+m: SS.b PB0.b
+p: PB0.b PB1.a T.ia
+q: PB1.a T.ia T.c T.ta
+x: T.ta X.c
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l BZ.bz MC1.c MC2.c FR.c FLS.pwr T.c X.c RL.l GL.l`,
+4:`c1: EOCR.b EOCR.a EOCR.pwr
+bus: EOCR.b SS.a SS.b X.a#1 MC1.a MC2.a
+e: EOCR.a YL.l BZ.bz
+A: SS.a FLS.pwr FLS.a
+m: SS.b PB0.b
+p: PB0.b PB1.a X.a#2
+q: FLS.a PB1.a X.a#2 FR.c X.c
+k: X.a#1 FR.fb FR.fa
+m1: FR.fb MC1.c
+j: FR.fa T.tb T.c
+m2: T.tb MC2.c
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l BZ.bz FLS.pwr FR.c X.c MC1.c MC2.c T.c RL.l GL.l`,
+5:`c1: EOCR.b EOCR.a EOCR.pwr
+bus: EOCR.b SS.a SS.b MC1.a MC2.a
+e: EOCR.a YL.l BZ.bz
+A: SS.a FLS.pwr FLS.a
+m: SS.b PB0.b
+p: PB0.b PB1.a X.a
+q: FLS.a PB1.a X.a X.c T.c T.tb FR.fb FR.fa T.ta
+f: T.tb FR.c
+m1: FR.fb MC1.c
+m2: FR.fa T.ta MC2.c
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l BZ.bz FLS.pwr X.c T.c FR.c MC1.c MC2.c RL.l GL.l`,
+6:`c1: EOCR.b EOCR.a EOCR.pwr
+bus: EOCR.b SS.a SS.b X.a
+e: EOCR.a YL.l BZ.bz
+A: SS.a FLS.pwr FLS.a
+x: FLS.a X.c
+m: SS.b PB0.b
+p: PB0.b PB1.a T.ia
+q: PB1.a T.ia X.b X.a FR.fb T.tb FR.fa T.ta
+t: X.b T.c
+fr: T.ta FR.c
+m1: FR.fb MC1.c RL.l
+m2: T.tb FR.fa MC2.c GL.l
+N: EOCR.pwr YL.l BZ.bz FLS.pwr X.c T.c FR.c MC1.c RL.l GL.l MC2.c`,
+7:`c1: EOCR.b EOCR.a EOCR.pwr
+bus: EOCR.b SS.a SS.b X.a#1 MC1.a MC2.a
+e: EOCR.a YL.l BZ.bz
+A: SS.a FLS.pwr FLS.a
+m: SS.b PB0.b
+p: PB0.b PB1.a X.a#2
+q: FLS.a PB1.a X.a#2 FR.c X.c
+k: X.a#1 FR.fb
+j: FR.fb T.c T.tb T.ta
+m1: T.tb MC1.c
+m2: T.ta MC2.c
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l BZ.bz FLS.pwr FR.c X.c T.c MC1.c MC2.c RL.l GL.l`,
+8:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a BZ.bz
+bus: EOCR.b SS.a SS.b X.a MC1.a MC2.a
+A: SS.a FLS.pwr FLS.a
+k: FLS.a X.c FR.c FR.fb
+y: FR.fb YL.l
+m: SS.b PB0.b
+p: PB0.b PB1.a T.ia
+q: PB1.a T.ia X.a X.b T.tb
+t: X.b T.c
+mm: T.tb MC1.c MC2.c
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr BZ.bz FLS.pwr X.c FR.c YL.l T.c MC1.c MC2.c RL.l GL.l`,
+9:`c1: EOCR.b EOCR.a EOCR.pwr
+bus: EOCR.b X.a#1 SS.a SS.b T.ta MC1.a MC2.a
+e: EOCR.a FR.c FR.fa FR.fb
+y: FR.fa YL.l
+z: FR.fb BZ.bz
+A: SS.a FLS.a FLS.pwr
+k: X.a#1 FLS.a MC1.c
+m: SS.b PB0.b
+p: PB0.b PB1.a X.a#2
+q: PB1.a X.a#2 X.c T.c
+m2: T.ta MC2.c
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr FR.c YL.l BZ.bz MC1.c FLS.pwr X.c T.c MC2.c RL.l GL.l`,
+10:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a YL.l
+s: EOCR.b PB0.b
+bus: PB0.b PB1.a X1.a#1 PB2.a X2.a#1 X1.a#2 X2.a#2 MC1.a MC2.a
+q1: PB1.a X1.a#1 X1.c TB4.ls1 T1.ta
+t1: TB4.ls1 T1.c
+m1: T1.ta MC1.c
+q2: PB2.a X2.a#1 X2.c TB4.ls2 T2.ta
+t2: TB4.ls2 T2.c
+m2: T2.ta MC2.c
+w1: X1.a#2 MC1.b
+w2: X2.a#2 MC2.b
+w: MC1.b MC2.b WL.l
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l X1.c T1.c MC1.c X2.c T2.c MC2.c WL.l RL.l GL.l`,
+11:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a YL.l
+s: EOCR.b PB0.b
+bus: PB0.b PB1.a T1.ta PB2.a T2.ta X1.a X2.a MC1.a MC2.a
+q1: PB1.a T1.ta X1.c TB4.ls1 X2.b
+mc1: TB4.ls1 MC1.c
+t1: X2.b T1.c
+q2: PB2.a T2.ta X2.c TB4.ls2 X1.b
+mc2: TB4.ls2 MC2.c
+t2: X1.b T2.c
+w1: X1.a MC1.b
+w2: X2.a MC2.b
+w: MC1.b MC2.b WL.l
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l X1.c MC1.c T1.c X2.c MC2.c T2.c WL.l RL.l GL.l`,
+12:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a YL.l
+s: EOCR.b PB0.b
+bus: PB0.b PB1.a X1.a T2.ta PB2.a X2.a T1.ta T1.ia T2.ia MC1.a MC2.a
+q1: PB1.a X1.a T2.ta X1.c TB4.ls1 MC1.b
+mc1: TB4.ls1 MC1.c
+t1: MC1.b T1.c
+q2: PB2.a X2.a T1.ta X2.c MC2.c TB4.ls2
+t2: TB4.ls2 T2.c
+w: T1.ia T2.ia WL.l
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l X1.c MC1.c T1.c X2.c MC2.c T2.c WL.l RL.l GL.l`,
+13:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a YL.l
+s: EOCR.b PB0.b
+bus: PB0.b PB1.a X1.a#1 TB4.ls1 PB2.a X2.a T1.ta T1.ia T2.ia MC1.a MC2.a
+q1: PB1.a X1.a#1 TB4.ls1 T2.tb
+k1: T2.tb X1.c TB4.ls2 MC1.b
+mc1: TB4.ls2 MC1.c
+t1: MC1.b T1.c
+q2: PB2.a X2.a T1.ta X2.c MC2.c X1.a#2
+t2: X1.a#2 T2.c
+w: T1.ia T2.ia WL.l
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l X1.c MC1.c T1.c X2.c MC2.c T2.c WL.l RL.l GL.l`,
+14:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a YL.l
+s: EOCR.b PB0.b
+bus: PB0.b TB4.ls1 TB4.ls2 PB1.a T1.ia MC1.a#1 PB2.a T2.ia MC2.a MC1.b
+x1: TB4.ls1 X1.c
+x2: TB4.ls2 X2.c
+q1: PB1.a T1.ia X1.a#1
+s1: X1.a#1 X2.a#1
+s2: X2.a#1 T1.tb
+m1: T1.tb MC1.c T1.c
+q2: PB2.a T2.ia X1.a#2 X2.a#2
+s3: X1.a#2 X2.a#2 T2.tb
+m2: T2.tb MC2.c T2.c
+w: MC1.b MC2.b
+wl: MC2.b WL.l
+r: MC1.a#1 RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l X1.c X2.c MC1.c T1.c RL.l MC2.c T2.c GL.l WL.l`,
+15:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a YL.l
+s: EOCR.b PB0.b
+bus: PB0.b TB4.ls1 TB4.ls2 PB1.a T1.ia MC1.a PB2.a T2.ia MC2.a MC1.b
+x1: TB4.ls1 X1.c
+x2: TB4.ls2 X2.c
+q1: PB1.a X1.a#1 X2.a#1
+k1: X1.a#1 X2.a#1 T1.ia T1.tb
+m1: T1.tb MC1.c T1.c
+q2: PB2.a X1.a#2
+s2: X1.a#2 X2.a#2
+k2: X2.a#2 T2.ia T2.tb
+m2: T2.tb MC2.c T2.c
+w: MC1.b MC2.b
+wl: MC2.b WL.l
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l X1.c X2.c MC1.c T1.c RL.l MC2.c T2.c GL.l WL.l`,
+16:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a YL.l
+s: EOCR.b PB0.b
+bus: PB0.b TB4.ls1 TB4.ls2 PB1.a X1.a T1.ta MC1.a PB2.a X2.a T2.ia MC2.a
+t1: TB4.ls1 T1.c
+t2: TB4.ls2 T2.c
+q1: PB1.a X1.a T1.ta MC1.c X1.c
+q2: PB2.a X2.a T2.ia T1.ia
+k2: T1.ia T2.tb T2.ta X2.c
+m2: T2.tb MC2.c
+wl: T2.ta WL.l
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l T1.c T2.c MC1.c X1.c RL.l MC2.c WL.l X2.c GL.l`,
+17:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a YL.l
+s: EOCR.b PB0.b
+bus: PB0.b TB4.ls1 TB4.ls2 PB1.a T1.ia MC1.a PB2.a T2.ia MC2.a
+x1: TB4.ls1 X1.c
+x2: TB4.ls2 X2.c
+q1: PB1.a T1.ia X1.a X1.b
+s1: X1.a X2.b
+s2: X1.b X2.a
+k1: X2.b X2.a MC1.c T1.c
+q2: PB2.a T2.ia T1.ta
+k2: T1.ta T2.tb T2.ta T2.c
+m2: T2.tb MC2.c
+wl: T2.ta WL.l
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l X1.c X2.c MC1.c T1.c RL.l MC2.c WL.l T2.c GL.l`,
+18:`c1: EOCR.b EOCR.a EOCR.pwr
+e: EOCR.a YL.l
+s: EOCR.b PB0.b
+bus: PB0.b TB4.ls1 TB4.ls2 PB1.a T1.ia MC1.a PB2.a T2.ia MC2.a T1.ta T2.ta
+x1: TB4.ls1 X1.c
+x2: TB4.ls2 X2.c
+q1: PB1.a X1.a
+s1: X1.a X2.b
+k1: X2.b T1.ia MC1.c T1.c
+q2: PB2.a X1.b
+s2: X1.b X2.a
+k2: X2.a T2.ia MC2.c T2.c
+wl: T1.ta T2.ta WL.l
+r: MC1.a RL.l
+g: MC2.a GL.l
+N: EOCR.pwr YL.l X1.c X2.c MC1.c T1.c RL.l MC2.c T2.c GL.l WL.l`};
+const ANS_KIND={a:'no',b:'nc',c:'coil',l:'lamp',bz:'buzzer',f:'cond',pwr:'pwr',ia:'ino',ta:'tno',tb:'tnc',fa:'fno',fb:'fnc',ls1:'ls1',ls2:'ls2'};
+/* 기구 안에서 서로 이어진 단자 (EOCR 10·11) — 둘 중 어느 쪽에 물려도 같다 */
+const LINKED={eocr:[['10','11']]};
+const ANS_COLOR={L1:'br',R:'br',U:'br',U1:'br',U2:'br',L2:'k',S:'k',V:'k',V1:'k',V2:'k',L3:'gy',T:'gy',W:'gy',W1:'gy',W2:'gy',PE:'ge'};
+function parseAns(n){
+  const nodes=new Map(),els=new Map(),opt=[],join=[];
+  const node=nm=>{if(!nodes.has(nm))nodes.set(nm,{nm,pins:[],ends:[]});return nodes.get(nm);};
+  for(const line of [ANS_MAIN,n<=9?ANS_FLS:'',ANS[n]||''].join('\n').split('\n')){
+    const s=line.trim();if(!s)continue;
+    if(s[0]==='~'||s[0]==='='){(s[0]==='~'?opt:join).push(s.slice(1).trim().split(/\s+/));continue;}
+    const m=s.match(/^(\S+):\s*(.*)$/);if(!m)continue;const nd=node(m[1]);
+    for(const t of m[2].split(/\s+/).filter(Boolean)){
+      if(t.includes(':')){nd.pins.push(t);continue;}
+      const [lab,rest]=t.split('.');
+      if(!els.has(t))els.set(t,{id:t,label:lab,kind:ANS_KIND[rest.split('#')[0]],nodes:[]});
+      els.get(t).nodes.push(nd.nm);nd.ends.push(t);
+    }
+  }
+  return {nodes,els,opt,join};
+}
+/* 수험자 배선의 연결 묶음(cur)에 가장 잘 맞도록 정답의 접점 단자와 방향을 고른 뒤, 단자 단위 연결 묶음으로 바꾼다.
+   cur가 없으면 내부 결선표의 앞쪽 단자를 쓴다. 반환: [{nm, pins:['X:1',...]}]
+   out.endPin: 접점·코일의 끝('X.a#1@q')이 실제로 어느 단자('X:3')인지.
+   split이면 '=' 로 묶인 점을 합치지 않고 반환값의 join에 [가, 나]로 남긴다 (정답 배선을 놓을 때 색을 나누려고) */
+function concreteAnswer(n,cur,split){
+  const A=parseAns(n),types={};
+  for(const p of buildProblem(n).parts)types[p.label]=p.type;
+  const netOf=new Map();(cur||[]).forEach((net,i)=>net.forEach(k=>netOf.set(k,i)));
+  const owner=new Map(),members=new Map(),cnt=new Map(),endPin={};
+  for(const nm of A.nodes.keys())members.set(nm,[]);
+  /* cnt: 수험자 묶음마다 정답 점별로 이미 들어간 단자 수 */
+  const own=(pin,nm,undo)=>{
+    if(owner.has(pin))return;owner.set(pin,nm);members.get(nm).push(pin);if(undo)undo.push(pin);
+    if(netOf.has(pin)){const i=netOf.get(pin);if(!cnt.has(i))cnt.set(i,new Map());const m=cnt.get(i);m.set(nm,(m.get(nm)||0)+1);}
+  };
+  const unown=pin=>{
+    const nm=owner.get(pin),a=members.get(nm);owner.delete(pin);a.splice(a.lastIndexOf(pin),1);
+    if(netOf.has(pin)){const m=cnt.get(netOf.get(pin));m.set(nm,m.get(nm)-1);}
+  };
+  for(const nd of A.nodes.values())for(const p of nd.pins)own(p,nd.nm);
+  const linked=p=>{const i=p.indexOf(':'),lab=p.slice(0,i),k=p.slice(i+1),g=[];
+    for(const [x,y] of LINKED[types[lab]]||[]){if(k===x)g.push(`${lab}:${y}`);if(k===y)g.push(`${lab}:${x}`);}return g;};
+  const opts=e=>{
+    const t=types[e.label];if(!t)return [];
+    const o=[];
+    for(const [k,a,b] of elsOf(t)){
+      if(k!==e.kind)continue;o.push([a,b]);
+      for(const [x,y] of LINKED[t]||[])for(const [u,v] of [[x,y],[y,x]]){if(a===u)o.push([v,b]);if(b===u)o.push([a,v]);}
+    }
+    const r=[];for(const [a,b] of o)if(a!==b)r.push([a,b],[b,a]);
+    return r.map(([a,b])=>[`${e.label}:${a}`,`${e.label}:${b}`]);
+  };
+  /* 단자 p를 점 nm에 넣을 때의 점수: 수험자도 같은 점에 물린 단자면 높게, 다른 점에 물린 단자면 낮게.
+     이미 다른 점에 쓰인 단자, 또는 기구 안에서 그 단자와 이어진 단자가 다른 점에 쓰였으면 넣을 수 없다(null) */
+  const fit=(p,nm)=>{
+    for(const q of [p,...linked(p)]){const o=owner.get(q);if(o&&o!==nm)return null;}
+    if(owner.get(p)===nm)return 3;
+    if(!netOf.has(p))return 0;
+    const m=cnt.get(netOf.get(p));let same=0,other=0;
+    if(m)for(const [k,v] of m){if(k===nm)same+=v;else other+=v;}
+    return same?3:other?-2:1;
+  };
+  const cands=e=>{const r=[];
+    for(const o of opts(e)){const fa=fit(o[0],e.nodes[0]),fb=fit(o[1],e.nodes[1]);if(fa!==null&&fb!==null)r.push({o,s:fa+fb});}
+    return r.sort((x,y)=>y.s-x.s);};
+  /* 점수가 가장 높은 것부터 정하고, 막히면 되돌아가 다른 단자를 고른다 */
+  const els=[...A.els.values()].filter(e=>opts(e).length),done=new Set();let budget=400;
+  const solve=strict=>{
+    if(done.size===els.length)return true;
+    let best=null;
+    for(const e of els){if(done.has(e))continue;const c=cands(e);
+      if(!c.length){if(strict)return false;continue;}
+      if(!best||c[0].s>best.c[0].s||(c[0].s===best.c[0].s&&c.length<best.c.length))best={e,c};}
+    if(!best)return true;
+    done.add(best.e);
+    for(const {o} of strict?best.c:best.c.slice(0,1)){
+      const undo=[];own(o[0],best.e.nodes[0],undo);own(o[1],best.e.nodes[1],undo);
+      endPin[best.e.id+'@'+best.e.nodes[0]]=o[0];endPin[best.e.id+'@'+best.e.nodes[1]]=o[1];
+      if(solve(strict))return true;
+      for(const p of undo.reverse())unown(p);
+      delete endPin[best.e.id+'@'+best.e.nodes[0]];delete endPin[best.e.id+'@'+best.e.nodes[1]];
+      if(--budget<0)break;
+    }
+    done.delete(best.e);return false;
+  };
+  if(!solve(true)){done.clear();solve(false);}
+  /* 기구 안에서 이어진 단자는 수험자가 같은 묶음에 물렸으면 정답 묶음에도 넣는다 */
+  for(const [pin,nm] of [...owner]){
+    const i=pin.indexOf(':'),lab=pin.slice(0,i),k=pin.slice(i+1);
+    for(const [x,y] of LINKED[types[lab]]||[]){const o=k===x?y:k===y?x:null,q=o&&`${lab}:${o}`;
+      if(q&&!owner.has(q)&&netOf.has(q)&&netOf.get(q)===netOf.get(pin))own(q,nm);}
+  }
+  for(const [x,y] of A.opt){
+    const X=members.get(x),Y=members.get(y);
+    if(X&&Y&&X.some(p=>netOf.has(p)&&Y.some(q=>netOf.get(q)===netOf.get(p)))){Y.push(...X);X.length=0;}
+  }
+  if(!split)for(const [x,y] of A.join){const X=members.get(x),Y=members.get(y);if(X&&Y){Y.push(...X);X.length=0;}}
+  const out=[...members].filter(([,ps])=>ps.length>1).map(([nm,ps])=>({nm,pins:[...new Set(ps)].sort(nat)}));
+  if(split)out.join=A.join;
+  out.endPin=endPin;
+  return out;
+}
+/* 기본 정답대로 전선을 놓는다. 제어함 밖 기구는 위쪽은 TB5, 아래쪽은 TB6 단자를 거친다 */
+const INBOX=new Set(['mccb','fuse','eocr','mc','relay','timer','flicker','fls']);
+function answerWires(){
+  const nets=concreteAnswer(prob,null,true),byLab=new Map(S.parts.map(p=>[p.label,p])),used2={};
+  const tbs={TB5:byLab.get('TB5'),TB6:byLab.get('TB6')},used={TB5:0,TB6:0},wires=[];
+  const ep=k=>{const i=k.indexOf(':'),p=byLab.get(k.slice(0,i));return p&&DEFS[p.type].pins.some(q=>q.k===k.slice(i+1))?{p:p.id,k:k.slice(i+1)}:null;};
+  const chain=(list,c)=>{
+    if(list.length<2)return;
+    const P=list.map(pinPos),cx=P.reduce((s,q)=>s+q.x,0)/P.length,cy=P.reduce((s,q)=>s+q.y,0)/P.length;
+    let si=0,sd=-1;P.forEach((q,i)=>{const d=Math.abs(q.x-cx)+Math.abs(q.y-cy);if(d>sd){sd=d;si=i;}});
+    const rest=list.map((e,i)=>({e,q:P[i]})),path=rest.splice(si,1);
+    while(rest.length){const a=path[path.length-1].q;let bi=0,bd=Infinity;rest.forEach((r,i)=>{const d=Math.abs(a.x-r.q.x)+Math.abs(a.y-r.q.y);if(d<bd){bd=d;bi=i;}});path.push(rest.splice(bi,1)[0]);}
+    for(let i=1;i<path.length;i++)wires.push({a:path[i-1].e,b:path[i].e,c});
+  };
+  for(const {nm,pins} of nets){
+    const c=ANS_COLOR[nm]||'y',inside=[],grp={TB5:[],TB6:[]};
+    for(const e of pins.map(ep).filter(Boolean)){const p=partById(e.p),d=DEFS[p.type];
+      if(INBOX.has(p.type))inside.push(e);else grp[p.y+d.h/2<500?'TB5':'TB6'].push(e);}
+    /* 제어함 안쪽 기구가 없고 한쪽(위 또는 아래)에만 있는 묶음은 단자대를 거치지 않고 바로 잇는다 */
+    if(!inside.length&&(!grp.TB5.length||!grp.TB6.length)){chain([...grp.TB5,...grp.TB6],c);continue;}
+    for(const t of ['TB5','TB6']){
+      const g=grp[t],tb=tbs[t];if(!g.length)continue;
+      if(!tb||used[t]>=20){inside.push(...g);continue;}
+      const i=++used[t],top={p:tb.id,k:''+i},bot={p:tb.id,k:i+"'"},out=t==='TB5'?top:bot;
+      chain([out,...g],c);inside.push(t==='TB5'?bot:top);
+    }
+    chain(inside,c);used2[nm]={inside,c};
+  }
+  /* '='로 묶인 점: 전선이 2가닥 미만인 단자끼리 가장 가까운 곳을 그 점(나)의 색으로 잇는다 */
+  const cnt={},cntOf=e=>cnt[e.p+'|'+e.k]||0;
+  for(const w of wires)for(const e of [w.a,w.b])cnt[e.p+'|'+e.k]=cntOf(e)+1;
+  for(const [x,y] of nets.join||[]){
+    const X=used2[x],Y=used2[y];if(!X||!Y)continue;
+    let best=null;
+    for(const a of X.inside)for(const b of Y.inside){if(cntOf(a)>=2||cntOf(b)>=2)continue;
+      const P=pinPos(a),Q=pinPos(b),d=Math.abs(P.x-Q.x)+Math.abs(P.y-Q.y);if(!best||d<best.d)best={a,b,d};}
+    if(best){wires.push({a:best.a,b:best.b,c:Y.c});cnt[best.a.p+'|'+best.a.k]=cntOf(best.a)+1;cnt[best.b.p+'|'+best.b.k]=cntOf(best.b)+1;}
+  }
+  pushUndo();
+  S.wires=wires.map(w=>({id:'w'+S.nextId++,...w}));reroute(S.wires);
+  sel=null;cmp=null;afterChange();
 }
 function dupLabels(){const s=new Set(),d=new Set();for(const p of S.parts){if(s.has(p.label))d.add(p.label);s.add(p.label);}return [...d];}
 
@@ -889,9 +1352,10 @@ function renderPanel(){
     h+=`<div class="eyebrow">전기기능사 공개문제</div><h2>${prob}번 과제</h2>`;
     h+=`<div class="stat"><div><b>${S.parts.length}</b><span>기구</span></div><div><b>${S.wires.length}</b><span>전선</span></div><div><b class="${over?'bad':''}">${over}</b><span>3가닥 단자</span></div></div>`;
     if(dl.length)h+=`<p class="bad small">도면 기호가 겹칩니다: ${esc(dl.join(', '))}</p>`;
-    h+=`<h3>정답 비교</h3><p class="small muted">완성한 배선을 이 과제의 정답으로 저장해 두면, 다시 배선한 결과와 기구 단자 사이의 연결을 비교합니다. TB5·TB6에서 몇 번 단자를 거쳤는지는 따지지 않습니다.</p>`;
-    h+=`<div class="row"><button class="btn" id="b-setans">현재 배선을 정답으로</button><button class="btn primary" id="b-cmp" ${answer?'':'disabled'}>정답과 비교</button></div>`;
-    if(answer)h+=`<p class="small muted">저장된 정답: 연결 묶음 ${answer.length}개</p>`;
+    h+=`<h3>정답 비교</h3>`;
+    if(answer)h+=`<p class="small muted">직접 저장한 정답(연결 묶음 ${answer.length}개)과 비교합니다. TB5·TB6에서 몇 번 단자를 거쳤는지는 따지지 않습니다.</p>`;
+    else h+=`<p class="small muted">공개문제 시퀀스 회로도로 만든 정답과 비교합니다. 접점 단자(예: 릴레이 a접점 1-3과 8-6)와 코일·램프의 방향은 어느 쪽을 써도 맞게 봅니다. TB5·TB6에서 몇 번 단자를 거쳤는지는 따지지 않습니다.</p>`;
+    h+=`<div class="row"><button class="btn primary" id="b-cmp">정답과 비교</button>${answer?'<button class="btn" id="b-defans">회로도 정답으로 되돌리기</button>':''}</div>`;
     if(cmp){
       if(!cmp.miss.length&&!cmp.extra.length)h+=`<div class="card good">정답과 연결이 모두 같습니다.</div>`;
       else{h+=`<div class="card">`;
@@ -899,10 +1363,11 @@ function renderPanel(){
         if(cmp.extra.length)h+=`<div class="bad" style="margin-top:8px">잘못된 연결 ${cmp.extra.length}개</div><ul class="list mono">${cmp.extra.map(([a,b])=>`<li>${esc(a)} ↔ ${esc(b)}</li>`).join('')}</ul>`;
         h+=`</div>`;}
     }
+    h+=`<details><summary>선생님용</summary><p class="small muted">정답 배선 불러오기는 지금 전선을 모두 지우고 회로도 정답대로 전선을 놓습니다. 되돌리기로 취소할 수 있습니다.</p><div class="row"><button class="btn" id="b-answ">정답 배선 불러오기</button><button class="btn" id="b-setans">현재 배선을 정답으로</button></div></details>`;
     h+=`<details><summary>결선 목록 (${nets.length}개 묶음)</summary><ul class="list mono">${nets.map(n=>`<li>${esc(n.join(' · '))}</li>`).join('')||'<li class="muted">전선이 없습니다</li>'}</ul></details>`;
     h+=`<div class="row"><button class="btn" id="b-add">기구 추가</button><button class="btn" id="b-pm2">핀 설정</button></div>`;
     h+=`<div class="row"><button class="btn" id="b-reroute" ${S.wires.length?'':'disabled'}>전선 경로 모두 정리</button><button class="btn danger" id="b-relay">배치 처음대로</button></div>`;
-    h+=`<h3>배선 규칙 (공개문제)</h3><ul class="list"><li>주회로 2.5mm²: L1 갈색, L2 흑색, L3 회색</li><li>제어회로 1.5mm² 황색, 보호도체 녹색-황색</li><li>한 단자에 전선 3가닥 이상 접속 금지</li><li>제어회로 전원은 퓨즈 2차측 L1(갈)·L3(회)</li></ul>`;
+    h+=`<h3>배선 규칙 (공개문제)</h3><ul class="list"><li>주회로 2.5mm²: L1 갈색, L2 흑색, L3 회색</li><li>제어회로 1.5mm² 황색, 보호도체 녹색-황색</li><li>한 단자에 전선 2가닥까지만 접속 (2가닥이 물린 단자는 회색으로 표시되고 더 이을 수 없음)</li><li>제어회로 전원은 퓨즈 2차측 L1(갈)·L3(회)</li></ul>`;
   }
   el.innerHTML=h;bindPanel();
 }
@@ -919,7 +1384,9 @@ function bindPanel(){
   on('#b-delw',()=>delWire(w.id));on('#b-auto',()=>{pushUndo();w.pts=routeWire(w.a,w.b,buildGrid(w.id))||undefined;afterChange();});
   for(const b of document.querySelectorAll('[data-wc]'))b.onclick=()=>{pushUndo();w.c=b.dataset.wc;wireColor=w.c;buildWirebar();afterChange();};
   on('#b-setans',()=>{if(!S.wires.length){toast('전선이 없습니다');return;}answer=elecNets();store.set('cpw2.a'+prob,answer);cmp=null;renderPanel();toast(`${prob}번 정답으로 저장했습니다`);});
-  on('#b-cmp',()=>{cmp=compare(answer,elecNets());renderPanel();});
+  on('#b-cmp',()=>{const cur=elecNets();cmp=compare(answer||concreteAnswer(prob,cur).map(n=>n.pins),cur);renderPanel();});
+  on('#b-defans',()=>{answer=null;store.del('cpw2.a'+prob);cmp=null;renderPanel();toast('회로도 정답과 비교합니다');});
+  on('#b-answ',()=>{answerWires();toast(`${prob}번 정답 배선을 놓았습니다. 되돌리기로 취소할 수 있습니다.`);});
 }
 
 /* ---------- 도면 창 ---------- */
@@ -932,12 +1399,52 @@ function renderDoc(){
     docB.innerHTML=`<div class="doc-ops"><p class="h">공개문제 ${prob}번 · 제어회로의 동작 사항</p>${L.map(l=>/^[가-하]\)/.test(l)?`<p class="h">${esc(l)}</p>`:/^※/.test(l)?`<p class="note">${esc(l)}</p>`:`<p class="i">${esc(l)}</p>`).join('')}</div>`;
   } else {
     const src={c:`img/c${n}.png`,b:`img/b${n}.png`,p:`img/pin${prob<=9?'01':'10'}.png`}[docTab];
-    docB.innerHTML=`<img src="${src}" alt="공개문제 ${prob}번 ${({c:'시퀀스 회로도',b:'배관 및 기구 배치도',p:'기구의 내부 결선도'})[docTab]}" style="width:${docZ*100}%">`;
+    docB.innerHTML=`<div class="docimg" style="width:${docZ*100}%"><img src="${src}" alt="공개문제 ${prob}번 ${({c:'시퀀스 회로도',b:'배관 및 기구 배치도',p:'기구의 내부 결선도'})[docTab]}">${docTab==='c'?'<svg id="hlsvg" viewBox="0 0 1892 788" preserveAspectRatio="none"></svg>':''}</div>`;
+    renderHL();
   }
 }
+/* ---------- 회로도 형광 표시 ----------
+   hl.json: 과제마다 회로도의 점(정답의 묶음 이름)별로 그림 위 선 그래프 {p:[[x,y]..], e:[[i,j]..], t:{끝: 점 번호}}.
+   끝은 'X.a#1@q'(접점·코일의 그 점 쪽 끝) 또는 'TB1:L1'(정해진 단자). 좌표는 img/cNN.png 픽셀.
+   tools/make_highlight.py가 공개문제 PDF의 회로도 그림에서 선을 찾아 정답 회로와 짝지어 만든다.
+   학생 배선에서 같은 묶음으로 이어진 끝들 사이의 선만 칠한다 → 바르게 이은 곳만 형광색이 된다 */
+let HL=null,hlOn=store.get('cpw2.hl',true);
+fetch('hl.json').then(r=>r.json()).then(j=>{HL=j;renderHL();}).catch(()=>{});
+function hlPath(g,a,b){
+  const n=g.p.length,adj=Array.from({length:n},()=>[]);
+  for(const [i,j] of g.e){const d=Math.abs(g.p[i][0]-g.p[j][0])+Math.abs(g.p[i][1]-g.p[j][1]);adj[i].push([j,d]);adj[j].push([i,d]);}
+  const D=new Array(n).fill(Infinity),prev=new Array(n).fill(-1),done=new Array(n).fill(false);D[a]=0;
+  for(;;){let u=-1;for(let i=0;i<n;i++)if(!done[i]&&D[i]<Infinity&&(u<0||D[i]<D[u]))u=i;if(u<0||u===b)break;done[u]=true;
+    for(const [v,d] of adj[u])if(D[u]+d<D[v]){D[v]=D[u]+d;prev[v]=u;}}
+  const out=[];if(D[b]===Infinity)return out;for(let v=b;prev[v]>=0;v=prev[v])out.push([prev[v],v]);return out;
+}
+function renderHL(){
+  const sv=document.getElementById('hlsvg');$('#doc-hl').classList.toggle('on',hlOn);
+  if(!sv)return;
+  const G=HL&&HL[prob];if(!hlOn||!G||!S.wires.length){sv.innerHTML='';return;}
+  const cur=elecNets(),netOf=new Map();cur.forEach((net,i)=>net.forEach(k=>netOf.set(k,i)));
+  const byLab=new Map(S.parts.map(p=>[p.label,p]));
+  const netOfPin=k=>{if(netOf.has(k))return netOf.get(k);const i=k.indexOf(':'),p=byLab.get(k.slice(0,i));
+    for(const [x,y] of (p&&LINKED[p.type])||[]){const o=k.slice(i+1)===x?y:k.slice(i+1)===y?x:null;if(o&&netOf.has(`${k.slice(0,i)}:${o}`))return netOf.get(`${k.slice(0,i)}:${o}`);}return undefined;};
+  const endPin=concreteAnswer(prob,cur).endPin;
+  let d='',dots='';
+  for(const g of Object.values(G)){
+    const grp=new Map();
+    for(const [key,pi] of Object.entries(g.t)){const pin=key.includes('@')?endPin[key]:key;if(!pin)continue;const i=netOfPin(pin);if(i===undefined)continue;
+      if(!grp.has(i))grp.set(i,[]);grp.get(i).push(pi);}
+    const seen=new Set();
+    for(const pis of grp.values()){
+      if(pis.length<2)continue;
+      for(const pi of pis)dots+=`<circle class="hlt" cx="${g.p[pi][0]}" cy="${g.p[pi][1]}" r="7"/>`;
+      for(let k=1;k<pis.length;k++)for(const [a,b] of hlPath(g,pis[0],pis[k])){const key=a<b?a+','+b:b+','+a;if(seen.has(key))continue;seen.add(key);d+=`M${g.p[a][0]} ${g.p[a][1]}L${g.p[b][0]} ${g.p[b][1]}`;}
+    }
+  }
+  sv.innerHTML=(d?`<path class="hl" d="${d}"/>`:'')+dots;
+}
+$('#doc-hl').onclick=()=>{hlOn=!hlOn;store.set('cpw2.hl',hlOn);renderHL();toast(hlOn?'바르게 이은 곳을 회로도에 형광색으로 표시합니다':'형광 표시를 껐습니다');};
 $('#doc-tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){docTab=b.dataset.tab;docZ=1;renderDoc();}});
-$('#doc-zi').onclick=()=>{docZ=Math.min(5,docZ*1.3);const i=docB.querySelector('img');if(i)i.style.width=docZ*100+'%';};
-$('#doc-zo').onclick=()=>{docZ=Math.max(1,docZ/1.3);const i=docB.querySelector('img');if(i)i.style.width=docZ*100+'%';};
+$('#doc-zi').onclick=()=>{docZ=Math.min(5,docZ*1.3);const i=docB.querySelector('.docimg');if(i)i.style.width=docZ*100+'%';};
+$('#doc-zo').onclick=()=>{docZ=Math.max(1,docZ/1.3);const i=docB.querySelector('.docimg');if(i)i.style.width=docZ*100+'%';};
 $('#doc-big').onclick=()=>{doc.classList.remove('min');doc.classList.toggle('big');$('#doc-big').textContent=doc.classList.contains('big')?'작게':'크게';};
 $('#doc-min').onclick=()=>{doc.classList.remove('big');$('#doc-big').textContent='크게';doc.classList.toggle('min');$('#doc-min').textContent=doc.classList.contains('min')?'펼치기':'접기';};
 $('#btn-doc').onclick=()=>{doc.hidden=!doc.hidden;};
@@ -945,7 +1452,23 @@ $('#btn-doc').onclick=()=>{doc.hidden=!doc.hidden;};
   const h=$('#doc-h');let st=null;
   h.addEventListener('pointerdown',e=>{if(e.target.closest('button')||doc.classList.contains('big'))return;const r=doc.getBoundingClientRect(),pr=$('#stage').getBoundingClientRect();st={x:e.clientX,y:e.clientY,l:r.left-pr.left,t:r.top-pr.top,pr};h.setPointerCapture(e.pointerId);});
   h.addEventListener('pointermove',e=>{if(!st)return;const l=clamp(st.l+e.clientX-st.x,-doc.offsetWidth+80,st.pr.width-80),t=clamp(st.t+e.clientY-st.y,0,st.pr.height-44);doc.style.left=l+'px';doc.style.top=t+'px';doc.style.right='auto';});
-  const end=()=>{st=null;};h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);
+  const end=()=>{if(st)saveDocBox();st=null;};h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);
+})();
+/* 도면 창 크기 조절: 아래 양쪽 모서리를 끈다. 위치와 크기는 이 기기에 기억한다 */
+function docBox(){const r=doc.getBoundingClientRect(),pr=$('#stage').getBoundingClientRect();return {l:r.left-pr.left,t:r.top-pr.top,w:r.width,h:r.height,pr};}
+function setDocBox(b){const pr=$('#stage').getBoundingClientRect(),w=clamp(b.w,260,pr.width),h=clamp(b.h,140,pr.height);
+  Object.assign(doc.style,{left:clamp(b.l,-w+80,pr.width-80)+'px',top:clamp(b.t,0,pr.height-44)+'px',right:'auto',width:w+'px',height:h+'px'});}
+function saveDocBox(){if(doc.classList.contains('big')||doc.classList.contains('min'))return;const b=docBox();store.set('cpw2.doc',{l:b.l,t:b.t,w:b.w,h:b.h});}
+(function resizeDoc(){
+  let st=null;
+  for(const el of document.querySelectorAll('.doc-rs')){
+    el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();st={side:el.dataset.rs,x:e.clientX,y:e.clientY,b:docBox()};el.setPointerCapture(e.pointerId);});
+    el.addEventListener('pointermove',e=>{if(!st)return;const dx=e.clientX-st.x,dy=e.clientY-st.y,b=st.b;
+      if(st.side==='r')setDocBox({l:b.l,t:b.t,w:b.w+dx,h:b.h+dy});
+      else{const w=clamp(b.w-dx,260,b.l+b.w);setDocBox({l:b.l+b.w-w,t:b.t,w,h:b.h+dy});}});
+    const end=()=>{if(st)saveDocBox();st=null;};el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
+  }
+  const b=store.get('cpw2.doc',null);if(b&&b.w)requestAnimationFrame(()=>setDocBox(b));
 })();
 
 /* ---------- 도구줄 ---------- */

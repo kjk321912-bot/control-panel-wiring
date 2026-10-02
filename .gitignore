@@ -5,3 +5,6 @@
 # 도구 실행 부산물
 __pycache__/
 node_modules/
+
+# 형광 표시 자료를 만들 때 쓰는 임시 파일
+tools/highlight/work/

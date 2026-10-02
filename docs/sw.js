@@ -1,7 +1,7 @@
 // 앱을 고친 뒤에는 VERSION을 올려야 태블릿에 새 버전이 내려갑니다.
-const VERSION='v5';
+const VERSION='v6';
 const CORE=[
-  './','index.html','manifest.webmanifest',
+  './','index.html','manifest.webmanifest','hl.json',
   'icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','icons/apple-touch-icon.png',
   'img/b01.png','img/b02.png','img/b03.png','img/b04.png','img/b05.png','img/b06.png','img/b07.png','img/b08.png','img/b09.png','img/b10.png','img/b11.png','img/b12.png','img/b13.png','img/b14.png','img/b15.png','img/b16.png','img/b17.png','img/b18.png','img/c01.png','img/c02.png','img/c03.png','img/c04.png','img/c05.png','img/c06.png','img/c07.png','img/c08.png','img/c09.png','img/c10.png','img/c11.png','img/c12.png','img/c13.png','img/c14.png','img/c15.png','img/c16.png','img/c17.png','img/c18.png','img/pin01.png','img/pin10.png'
 ];
