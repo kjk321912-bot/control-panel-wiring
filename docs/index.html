@@ -103,8 +103,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .doc.big .doc-rs,.doc.min .doc-rs{display:none}
 .doc-h{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);cursor:move;touch-action:none;flex-wrap:wrap}
 .doc-h .seg button{min-height:32px;padding:0 10px;font-size:12.5px}
-.doc-b{flex:1;overflow:auto;background:#fff;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
-.doc-b img{display:block;width:100%;height:auto;max-width:none}
+.doc-b{flex:1;overflow:auto;background:#fff;-webkit-overflow-scrolling:touch;touch-action:none;cursor:grab}
+.doc-b.drag{cursor:grabbing}
+.doc-b img{display:block;width:100%;height:auto;max-width:none;-webkit-user-drag:none;user-select:none;-webkit-user-select:none;pointer-events:none}
 .docimg{position:relative;max-width:none}
 .docimg svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .docimg .hl{fill:none;stroke:#b6ff00;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;opacity:.62;mix-blend-mode:multiply}
@@ -231,7 +232,7 @@ svg text{pointer-events:none}
   <header class="top">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#2a2d30"/><circle cx="9" cy="9" r="3" fill="#d6d9db"/><circle cx="21" cy="21" r="3" fill="#d6d9db"/><path d="M9 9V15H21V21" stroke="#e8c21c" stroke-width="2.4" fill="none"/></svg>
-      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v6</small></div>
+      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v7</small></div>
     </div>
     <select class="prob" id="prob" aria-label="공개문제 선택"></select>
     <div class="seg" id="modes">
@@ -1443,8 +1444,34 @@ function renderHL(){
 }
 $('#doc-hl').onclick=()=>{hlOn=!hlOn;store.set('cpw2.hl',hlOn);renderHL();toast(hlOn?'바르게 이은 곳을 회로도에 형광색으로 표시합니다':'형광 표시를 껐습니다');};
 $('#doc-tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){docTab=b.dataset.tab;docZ=1;renderDoc();}});
-$('#doc-zi').onclick=()=>{docZ=Math.min(5,docZ*1.3);const i=docB.querySelector('.docimg');if(i)i.style.width=docZ*100+'%';};
-$('#doc-zo').onclick=()=>{docZ=Math.max(1,docZ/1.3);const i=docB.querySelector('.docimg');if(i)i.style.width=docZ*100+'%';};
+/* 도면 확대: (px,py)는 도면 칸 안의 화면 위치. 그 자리의 그림 점이 그대로 손가락·마우스 아래에 남도록 스크롤을 맞춘다 */
+function setDocZ(z,px=docB.clientWidth/2,py=docB.clientHeight/2){
+  const i=docB.querySelector('.docimg');if(!i)return;
+  z=clamp(z,1,6);const k=z/docZ,x=docB.scrollLeft+px,y=docB.scrollTop+py;
+  docZ=z;i.style.width=z*100+'%';docB.scrollLeft=x*k-px;docB.scrollTop=y*k-py;
+}
+$('#doc-zi').onclick=()=>setDocZ(docZ*1.3);
+$('#doc-zo').onclick=()=>setDocZ(docZ/1.3);
+/* 도면 칸: 한 손가락(또는 마우스)으로 끌어 이동, 두 손가락으로 벌리고 오므려 확대·축소, 마우스 휠로 확대·축소 */
+(function panZoomDoc(){
+  const ptrs=new Map();let g=null;
+  const loc=e=>{const r=docB.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
+  const start=()=>{const P=[...ptrs.values()];
+    if(P.length===1)g={t:'pan',x:P[0].x,y:P[0].y,sl:docB.scrollLeft,st:docB.scrollTop};
+    else if(P.length===2&&docB.querySelector('.docimg')){const [a,b]=P,m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+      g={t:'pinch',d0:Math.hypot(a.x-b.x,a.y-b.y)||1,z0:docZ,ax:(docB.scrollLeft+m.x)/docZ,ay:(docB.scrollTop+m.y)/docZ};}
+    else g=null;
+    docB.classList.toggle('drag',!!g);};
+  docB.addEventListener('pointerdown',e=>{if(e.button>0)return;ptrs.set(e.pointerId,loc(e));docB.setPointerCapture(e.pointerId);start();});
+  docB.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,loc(e));if(!g)return;
+    if(g.t==='pan'){const p=ptrs.values().next().value;docB.scrollLeft=g.sl-(p.x-g.x);docB.scrollTop=g.st-(p.y-g.y);return;}
+    const [a,b]=[...ptrs.values()],m={x:(a.x+b.x)/2,y:(a.y+b.y)/2},i=docB.querySelector('.docimg');if(!i)return;
+    docZ=clamp(g.z0*Math.hypot(a.x-b.x,a.y-b.y)/g.d0,1,6);i.style.width=docZ*100+'%';
+    docB.scrollLeft=g.ax*docZ-m.x;docB.scrollTop=g.ay*docZ-m.y;});
+  const end=e=>{if(!ptrs.delete(e.pointerId))return;start();};
+  docB.addEventListener('pointerup',end);docB.addEventListener('pointercancel',end);
+  docB.addEventListener('wheel',e=>{if(!docB.querySelector('.docimg'))return;e.preventDefault();const p=loc(e);setDocZ(docZ*Math.exp(-e.deltaY*.0015),p.x,p.y);},{passive:false});
+})();
 $('#doc-big').onclick=()=>{doc.classList.remove('min');doc.classList.toggle('big');$('#doc-big').textContent=doc.classList.contains('big')?'작게':'크게';};
 $('#doc-min').onclick=()=>{doc.classList.remove('big');$('#doc-big').textContent='크게';doc.classList.toggle('min');$('#doc-min').textContent=doc.classList.contains('min')?'펼치기':'접기';};
 $('#btn-doc').onclick=()=>{doc.hidden=!doc.hidden;};
