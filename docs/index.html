@@ -191,6 +191,9 @@ svg text{pointer-events:none}
 .tn{font:600 9px var(--f-mono);fill:#e8ebed;text-anchor:middle}
 .tnb{font:600 10px var(--f-mono);fill:#e8ebed;text-anchor:middle}
 .tnd{font:600 9.5px var(--f-mono);fill:#363b3f;text-anchor:middle}
+.tape{fill:#efe2b8;stroke:#cdbb85;stroke-width:.6}
+.tapet{font:700 9.5px var(--f-ui);fill:#1f2a6b;text-anchor:middle}
+.tape-in{position:absolute;transform:translate(-50%,-50%);width:6.5em;font:700 16px var(--f-ui);text-align:center;color:#1f2a6b;background:#efe2b8;border:2px solid #1f2a6b;border-radius:4px;padding:3px;z-index:6}
 .tc{font:700 13px var(--f-ui);fill:var(--board-ink);text-anchor:middle}
 .tcx{font:700 13px var(--f-ui);fill:var(--fg);text-anchor:middle}
 .tstat{font:700 11px var(--f-ui);text-anchor:middle}
@@ -238,7 +241,7 @@ svg text{pointer-events:none}
   <header class="top">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#2a2d30"/><circle cx="9" cy="9" r="3" fill="#d6d9db"/><circle cx="21" cy="21" r="3" fill="#d6d9db"/><path d="M9 9V15H21V21" stroke="#e8c21c" stroke-width="2.4" fill="none"/></svg>
-      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v8</small></div>
+      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v9</small></div>
     </div>
     <select class="prob" id="prob" aria-label="공개문제 선택"></select>
     <div class="seg" id="modes">
@@ -445,7 +448,11 @@ function drawTBL(p,d,r){
 }
 function drawTB20(p,d){
   let s=`<rect width="${d.w}" height="${d.h}" rx="4" fill="#33373a"/><line x1="${6+30*10}" y1="2" x2="${6+30*10}" y2="${d.h-2}" stroke="#15171a" stroke-width="3"/>`;
-  for(let i=1;i<=20;i++){const x=21+30*(i-1);s+=T(x,44,i,'tnb');if(i>1&&i!==11)s+=`<line x1="${x-15}" y1="4" x2="${x-15}" y2="${d.h-4}" stroke="#4b5054"/>`;}
+  for(let i=1;i<=20;i++){const x=21+30*(i-1);s+=T(x,40,i,'tnb');if(i>1&&i!==11)s+=`<line x1="${x-15}" y1="4" x2="${x-15}" y2="${d.h-4}" stroke="#4b5054"/>`;}
+  /* 마스킹 테이프: 단자 번호 아래 띠. 단자마다 학생이 적은 글씨 (p.tape = {단자 번호: 글}) */
+  for(const x0 of [7,307])s+=`<rect class="tape" x="${x0}" y="45" width="298" height="13" rx="1.5"/>`;
+  for(const [i,t] of Object.entries(p.tape||{})){const x=21+30*(i-1),n=[...t].reduce((a,c)=>a+(c.charCodeAt(0)>255?2:1),0);
+    s+=T(x,55,t,'tapet',n>4?'textLength="27" lengthAdjust="spacingAndGlyphs"':'');}
   return s;
 }
 function drawMccb(p,d,r){
@@ -716,7 +723,7 @@ function setMode(m){
 }
 function updateHint(){
   const h={place:'<b>배치</b> 공개문제 배치도대로 기구가 놓여 있습니다. 끌어서 옮길 수 있고, 빈 곳을 끌면 화면이 이동합니다. 두 손가락으로 확대하세요.',
-    wire:pending?`<b>${esc(pinName(pending))}</b> 선택됨. 연결할 단자를 누르세요. 같은 단자를 다시 누르면 취소됩니다.`:'<b>배선</b> 단자를 누른 채 손가락으로 길을 그리고, 연결할 단자 위에서 떼세요. 기구 위로는 지나갈 수 없습니다. 단자 두 개를 차례로 눌러도 기구를 피해 자동으로 이어집니다.',
+    wire:pending?`<b>${esc(pinName(pending))}</b> 선택됨. 연결할 단자를 누르세요. 같은 단자를 다시 누르면 취소됩니다.`:'<b>배선</b> 단자를 누른 채 손가락으로 길을 그리고, 연결할 단자 위에서 떼세요. 기구 위로는 지나갈 수 없습니다. 단자 두 개를 차례로 눌러도 기구를 피해 자동으로 이어집니다. TB5·TB6 번호 아래 테이프를 누르면 글씨를 적을 수 있습니다.',
     sim:'<b>동작 시험</b> 전원을 켜고 버튼을 누르고 있으세요. MCCB·SS·EOCR(동작/리셋)·TB4(수위 또는 LS1/LS2)는 누를 때마다 바뀝니다.'}[mode];
   $('#hint').innerHTML=h;
 }
@@ -729,6 +736,7 @@ function setHov(el){if(hovPin===el)return;if(hovPin)hovPin.classList.remove('hov
 function clearRubber(){for(const id of ['#rubber','#drawp','#drawo']){const r=$(id);if(r)r.setAttribute('d','');}const b=$('#blockdot');if(b)b.setAttribute('r','0');setHov(null);}
 function cancelGesture(){if(!gest)return;if(dragId&&gest.p){dragId=null;fixRoutes(gest.p.id);}if(gest.t==='sim')simUp(gest.pid);if(gest.undo)afterChange();clearRubber();gest=null;}
 svg.addEventListener('pointerdown',e=>{
+  for(const o of document.querySelectorAll('.tape-in'))o.blur();
   if(e.pointerType==='mouse'&&e.button!==0)return;
   try{svg.setPointerCapture(e.pointerId);}catch(_){}
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -741,7 +749,7 @@ svg.addEventListener('pointerdown',e=>{
   else if(mode==='wire'){
     if(pinEl){const from={p:pinEl.dataset.part,k:pinEl.dataset.pin};if(pinFull(from)&&!samePin(pending,from)){fullMsg(from);return;}gest={...base,t:'wire',from};return;}
     if(wireEl){gest={...base,t:'tapwire',wid:wireEl.dataset.wire};return;}
-    if(pid){gest={...base,t:'tappart',pid};return;}
+    if(pid){const p=partById(pid);gest={...base,t:'tappart',pid,ox:bp.x-p.x,oy:bp.y-p.y};return;}
   } else {
     if(pid){const p=partById(pid);gest={...base,t:'drag',p,ox:bp.x-p.x,oy:bp.y-p.y};return;}
     if(wireEl){gest={...base,t:'tapwire',wid:wireEl.dataset.wire};return;}
@@ -783,9 +791,9 @@ function onUp(e){
   if(e.type==='pointercancel'){if(g.t==='sim')simUp(g.pid);if(g.undo)afterChange();clearRubber();return;}
   switch(g.t){
     case 'pan':if(!g.moved){sel=null;pending=null;renderAll();renderPanel();updateHint();}break;
-    case 'tappart':if(!g.moved){sel={t:'part',id:g.pid};pending=null;renderAll();renderPanel();updateHint();}break;
+    case 'tappart':if(!g.moved&&tapeAt(partById(g.pid),g.ox,g.oy))break;if(!g.moved){sel={t:'part',id:g.pid};pending=null;renderAll();renderPanel();updateHint();}break;
     case 'tapwire':if(!g.moved){sel={t:'wire',id:g.wid};pending=null;renderAll();renderPanel();updateHint();}break;
-    case 'drag':sel={t:'part',id:g.p.id};if(g.undo){dragId=null;fixRoutes(g.p.id);afterChange();}else{renderAll();renderPanel();}break;
+    case 'drag':if(!g.undo&&tapeAt(g.p,g.ox,g.oy))break;sel={t:'part',id:g.p.id};if(g.undo){dragId=null;fixRoutes(g.p.id);afterChange();}else{renderAll();renderPanel();}break;
     case 'sim':simUp(g.pid);break;
     case 'wire':{
       const here=g.from,target=hovPin?{p:hovPin.dataset.part,k:hovPin.dataset.pin}:null;clearRubber();
@@ -794,6 +802,24 @@ function onUp(e){
       else pending=samePin(pending,here)?null:here;
       sel=null;renderAll();renderPanel();updateHint();break;}
   }
+}
+/* 단자대 테이프에 글씨 쓰기: TB5·TB6의 번호 아래 띠를 누르면 그 자리에 입력 칸을 띄운다. 비우면 지워진다 */
+function tapeAt(p,lx,ly){
+  if(!p||p.type!=='tb20'||ly<30||ly>59||lx<6||lx>DEFS.tb20.w-6)return false;
+  const i=clamp(Math.floor((lx-6)/30)+1,1,20),cx=p.x+21+30*(i-1),cy=p.y+51.5;
+  const st=$('#stage').getBoundingClientRect(),r=svg.getBoundingClientRect();
+  for(const o of document.querySelectorAll('.tape-in'))o.blur();
+  const old=(p.tape&&p.tape[i])||'',inp=document.createElement('input');
+  Object.assign(inp,{className:'tape-in',value:old,maxLength:6,autocomplete:'off',enterKeyHint:'done'});
+  inp.style.left=r.left-st.left+view.tx+cx*view.s+'px';inp.style.top=r.top-st.top+view.ty+cy*view.s+'px';
+  inp.setAttribute('aria-label',`${p.label} ${i}번 단자 테이프`);
+  let done=false;
+  const commit=()=>{if(done)return;done=true;inp.remove();const t=inp.value.trim();if(t===old)return;
+    pushUndo();const tp={...(p.tape||{})};if(t)tp[i]=t;else delete tp[i];if(Object.keys(tp).length)p.tape=tp;else delete p.tape;afterChange();};
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();else if(e.key==='Escape'){inp.value=old;inp.blur();}});
+  $('#stage').appendChild(inp);inp.focus({preventScroll:true});inp.select();
+  return true;
 }
 function walk(gs,tx,ty){
   let cur=gs.cells[gs.cells.length-1];gs.blocked=false;
