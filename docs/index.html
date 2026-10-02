@@ -241,7 +241,7 @@ svg text{pointer-events:none}
   <header class="top">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#2a2d30"/><circle cx="9" cy="9" r="3" fill="#d6d9db"/><circle cx="21" cy="21" r="3" fill="#d6d9db"/><path d="M9 9V15H21V21" stroke="#e8c21c" stroke-width="2.4" fill="none"/></svg>
-      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v11</small></div>
+      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v12</small></div>
     </div>
     <select class="prob" id="prob" aria-label="공개문제 선택"></select>
     <div class="seg" id="modes">
@@ -494,7 +494,7 @@ let rt={};
 const sim={power:false,fault:null,uf:null,ph:null};
 const undoS=[],redoS=[];
 let answer=null,cmp=null;
-const rtOf=id=>rt[id]||(rt[id]={coil:false,t:0,done:false,flip:false,lit:false,powered:false,pressed:false,on:true,pos:0,trip:false,level:0,dir:1,flsOn:false,run:0,warn:'',ls1:false,ls2:false});
+const rtOf=id=>rt[id]||(rt[id]={coil:false,t:0,done:false,flip:false,lit:false,powered:false,pressed:false,on:false,pos:0,trip:false,level:0,dir:1,flsOn:false,run:0,warn:'',ls1:false,ls2:false});
 const partById=id=>S.parts.find(p=>p.id===id);
 const wireById=id=>S.wires.find(w=>w.id===id);
 const samePin=(a,b)=>a&&b&&a.p===b.p&&a.k===b.k;
@@ -677,7 +677,7 @@ let rafQ=0;function scheduleRender(){if(rafQ)return;rafQ=requestAnimationFrame((
 
 /* ---------- 기구 추가·삭제·배선 ---------- */
 function thumb(d){
-  const p={id:'_',type:d.type,label:d.prefix,set:d.set,x:0,y:0},r={coil:false,t:0,on:true,level:0,pos:0};
+  const p={id:'_',type:d.type,label:d.prefix,set:d.set,x:0,y:0},r={coil:false,t:0,on:false,level:0,pos:0};
   let s=d.draw(p,d,r);for(const q of d.pins)s+=`<circle cx="${q.x}" cy="${q.y}" r="5.5" fill="#d6d9db" stroke="#6b7276"/>`;
   return `<svg viewBox="-6 -6 ${d.w+12} ${d.h+12}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${s}</svg>`;
 }
@@ -784,7 +784,7 @@ function setMode(m){
 function updateHint(){
   const h={place:'<b>배치</b> 공개문제 배치도대로 기구가 놓여 있습니다. 끌어서 옮길 수 있고, 빈 곳을 끌면 화면이 이동합니다. 두 손가락으로 확대하세요.',
     wire:pending?`<b>${esc(pinName(pending))}</b> 선택됨. 연결할 단자를 누르세요. 같은 단자를 다시 누르면 취소됩니다.`:'<b>배선</b> 단자를 누른 채 손가락으로 길을 그리고, 연결할 단자 위에서 떼세요. 기구 위로는 지나갈 수 없습니다. 단자 두 개를 차례로 눌러도 기구를 피해 자동으로 이어집니다. TB5·TB6 번호 아래 테이프를 누르면 글씨를 적을 수 있습니다.',
-    sim:'<b>동작 시험</b> 전원을 켜고 버튼을 누르고 있으세요. MCCB·SS·EOCR(동작/리셋)·TB4(수위 또는 LS1/LS2)는 누를 때마다 바뀝니다.'}[mode];
+    sim:'<b>동작 시험</b> 전원을 켜고 MCCB를 눌러 투입(ON)한 뒤 버튼을 누르고 있으세요. MCCB·SS·EOCR(동작/리셋)·TB4(수위 또는 LS1/LS2)는 누를 때마다 바뀝니다.'}[mode];
   $('#hint').innerHTML=h;
 }
 
