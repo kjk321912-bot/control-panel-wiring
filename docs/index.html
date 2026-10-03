@@ -241,7 +241,7 @@ svg text{pointer-events:none}
   <header class="top">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="6" fill="#2a2d30"/><circle cx="9" cy="9" r="3" fill="#d6d9db"/><circle cx="21" cy="21" r="3" fill="#d6d9db"/><path d="M9 9V15H21V21" stroke="#e8c21c" stroke-width="2.4" fill="none"/></svg>
-      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v14</small></div>
+      <div><b>제어판 배선</b><small>전기기능사 공개문제 · v15</small></div>
     </div>
     <select class="prob" id="prob" aria-label="공개문제 선택"></select>
     <div class="seg" id="modes">
@@ -549,6 +549,7 @@ function buildGrid(skipWire,chan){
   const blk=new Uint8Array(W*H),occ=new Uint8Array(W*H);
   const at=(cx,cy)=>{const i=cx-gx0,j=cy-gy0;return (i<0||j<0||i>=W||j>=H)?-1:j*W+i;};
   for(const p of S.parts){const r=bodyRect(p);for(let cx=Math.floor(r.x0/G);cx*G<r.x1;cx++)for(let cy=Math.floor(r.y0/G);cy*G<r.y1;cy++)if(cx*G>r.x0&&cy*G>r.y0){const i=at(cx,cy);if(i>=0)blk[i]=1;}}
+  for(const r of gapRects())for(let cx=Math.ceil(r.x0/G);cx*G<=r.x1;cx++)for(let cy=Math.floor(r.y0/G)+1;cy*G<r.y1;cy++){const i=at(cx,cy);if(i>=0)blk[i]=1;}
   for(const w of S.wires){if(w.id===skipWire||!w.pts)continue;
     for(let i=0;i+1<w.pts.length;i++){const R=p=>({x:Math.round(p.x/G),y:Math.round(p.y/G)}),a=R(w.pts[i]),b=R(w.pts[i+1]);
       const sx=Math.sign(b.x-a.x),sy=Math.sign(b.y-a.y),n=Math.abs(b.x-a.x)+Math.abs(b.y-a.y);let x=a.x,y=a.y;
@@ -563,10 +564,22 @@ const SHARE=.5;
    통로 밖은 비싸게 해서 단자에서 가장 가까운 통로까지만 곧게 나와 들어간다. 제어함 밖은 그대로 */
 const PANEL={x0:0,y0:0,x1:1000,y1:1050},OFFCH=3;
 const inPanel=p=>p.y>=PANEL.y0&&p.y<PANEL.y1&&p.x>=PANEL.x0&&p.x<PANEL.x1;
-function channels(at,N){
-  const base=new Float32Array(N).fill(1),rows=[];
+function panelRows(){
+  const rows=[];
   for(const r of S.parts.filter(inPanel).map(bodyRect).sort((a,b)=>a.y0-b.y0)){
     const row=rows.find(w=>r.y0<w.y1&&r.y1>w.y0);if(row){row.y0=Math.min(row.y0,r.y0);row.y1=Math.max(row.y1,r.y1);row.it.push(r);}else rows.push({y0:r.y0,y1:r.y1,it:[r]});}
+  for(const row of rows)row.it.sort((a,b)=>a.x0-b.x0);
+  return rows;
+}
+/* 전기기능사 배선 규칙: 같은 줄 기구와 기구 사이 틈으로는 전선이 지나가지 않는다 → 그 틈은 막고, 위아래로는 제어함 가장자리로 돌린다 */
+function gapRects(){
+  const out=[];
+  for(const row of panelRows())for(let j=0;j+1<row.it.length;j++)out.push({x0:row.it[j].x1,x1:row.it[j+1].x0,y0:row.y0,y1:row.y1});
+  return out;
+}
+const obstacles=()=>[...S.parts.map(bodyRect),...gapRects()];
+function channels(at,N){
+  const base=new Float32Array(N).fill(1),rows=panelRows();
   const cx0=Math.ceil(PANEL.x0/G),cx1=Math.floor(PANEL.x1/G),cy0=Math.ceil(PANEL.y0/G),cy1=Math.floor(PANEL.y1/G);
   if(!rows.length)return base;
   for(let y=cy0;y<=cy1;y++)for(let x=cx0;x<=cx1;x++){const i=at(x,y);if(i>=0)base[i]=OFFCH;}
@@ -575,10 +588,9 @@ function channels(at,N){
   const hy=[];
   for(let k=0;k+1<rows.length;k++){const a=rows[k].y1,b=rows[k+1].y0,c=Math.round((a+b)/2/G),hb=Math.max(0,Math.floor((b-a)/G/2)-1);hy.push(c);
     for(let x=cx0;x<=cx1;x++)for(let d=-hb;d<=hb;d++)lane(at(x,c+d),Math.abs(d));}
-  /* 같은 줄 기구 사이(와 제어함 양옆)의 세로 통로: 위아래 가로 통로까지 잇는다 */
+  /* 제어함 양쪽 가장자리의 세로 통로: 위아래 가로 통로까지 잇는다. 기구 사이 틈은 gapRects로 막혀 있다 */
   rows.forEach((row,k)=>{
-    const it=row.it.sort((a,b)=>a.x0-b.x0),gaps=[[PANEL.x0,it[0].x0]];
-    for(let j=0;j+1<it.length;j++)gaps.push([it[j].x1,it[j+1].x0]);gaps.push([it[it.length-1].x1,PANEL.x1]);
+    const it=row.it,gaps=[[PANEL.x0,it[0].x0],[it[it.length-1].x1,PANEL.x1]];
     const ya=k?hy[k-1]:Math.floor(row.y0/G),yb=k<hy.length?hy[k]:Math.ceil(row.y1/G);
     for(const [a,b] of gaps){if(b-a<G*2)continue;const c=Math.round((a+b)/2/G),hb=Math.max(0,Math.floor((b-a)/G/2)-1);
       for(let y=ya;y<=yb;y++)for(let d=-hb;d<=hb;d++)lane(at(c+d,y),Math.abs(d));}
@@ -621,7 +633,7 @@ function unjog(a){
   const [p0,p1,p2,p3]=a;
   if(p0.y!==p1.y||p1.x!==p2.x||p2.y!==p3.y||p1.x===p0.x||p1.y===p2.y)return a;
   if(Math.sign(p1.x-p0.x)!==Math.sign(p3.x-p2.x))return a;
-  const c={x:p0.x,y:p2.y},rs=S.parts.map(bodyRect);
+  const c={x:p0.x,y:p2.y},rs=obstacles();
   if(segHit(p0,c,rs)||segHit(c,p2,rs))return a;
   return [p0,c,...a.slice(2)];
 }
@@ -632,7 +644,7 @@ function routeWire(a,b,g){const A=exitOf(a),B=exitOf(b),cells=astar(g,{x:A.cx,y:
   return cells?tidy([{x:A.x,y:A.y},...cellPts(cells),{x:B.x,y:B.y}]):null;}
 function crossesBody(w){
   if(!w.pts)return true;
-  const rs=S.parts.map(bodyRect);
+  const rs=obstacles();
   for(let i=0;i+1<w.pts.length;i++)if(segHit(w.pts[i],w.pts[i+1],rs))return true;
   return false;
 }
